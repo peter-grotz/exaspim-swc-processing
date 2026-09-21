@@ -23,7 +23,6 @@ STAGE_FILES = {
     "refinement/final-voxel": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
     "final/ccf_space_reconstructions/jsons": ".json",
-    "dispatch/swcs": ".swc",
     "dispatch/merged": ".swc",
 }
 
@@ -195,7 +194,6 @@ def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: 
         f"specimen_space_reconstructions/swc/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.json",
-        f"source_reconstructions/raw/{stem}.swc",
         f"source_reconstructions/merged/{stem}.swc",
     ):
         assert (cell_dir / relative).is_file(), relative
