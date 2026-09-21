@@ -111,12 +111,6 @@ ARTIFACT_SPECS: tuple[ArtifactSpec, ...] = (
         suffix=".json",
         required=False,
     ),
-    _spec(
-        "source_merged",
-        ("dispatch/merged",),
-        "source_reconstructions/merged",
-        required=False,
-    ),
 )
 """Artifacts collected into each cell directory, in the order they are placed."""
 
