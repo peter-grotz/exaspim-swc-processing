@@ -21,6 +21,7 @@ STEMS = ("N001-794492-HP", "N003-794492-JG")
 
 STAGE_FILES = {
     "refinement/final-voxel": ".swc",
+    "refinement/final-voxel-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
     "final/ccf_space_reconstructions/jsons": ".json",
 }
@@ -113,7 +114,7 @@ def test_missing_roles_reports_only_required_artifacts(stage_root: Path) -> None
 
 def test_resolve_source_dir_prefers_the_first_existing_candidate(stage_root: Path) -> None:
     """Candidate source directories are tried in priority order."""
-    spec = next(spec for spec in ARTIFACT_SPECS if spec.role == "specimen")
+    spec = next(spec for spec in ARTIFACT_SPECS if spec.role == "specimen_refined")
     assert resolve_source_dir(stage_root, spec) == stage_root / "refinement/final-voxel"
 
 
@@ -190,7 +191,7 @@ def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: 
     cell_dir = written[parse_stem(stem)]
     assert cell_dir == output_root / f"asset_{stem}"
     for relative in (
-        f"specimen_space_reconstructions/swc/{stem}.swc",
+        f"specimen_space_reconstructions/refined/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.json",
     ):
@@ -228,3 +229,23 @@ def test_cell_artifacts_defaults_to_no_artifacts() -> None:
     cell = CellArtifacts(parse_stem(STEMS[0]))
     assert cell.artifacts == {}
     assert set(cell.missing_roles()) == {spec.role for spec in ARTIFACT_SPECS if spec.required}
+
+
+def test_specimen_resampled_is_optional_until_the_resample_stage_emits_it(
+    stage_root: Path,
+) -> None:
+    """The resample stage does not yet produce it, so its absence is not fatal."""
+    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
+        path.unlink()
+    (stage_root / "refinement/final-voxel-resampled").rmdir()
+    for cell in discover_cells(stage_root).values():
+        assert "specimen_resampled" not in cell.artifacts
+        assert cell.missing_roles() == ()
+
+
+def test_both_specimen_densities_are_written(stage_root: Path, tmp_path: Path) -> None:
+    """Refined and resampled sit side by side under specimen space."""
+    written = build_cell_layout(stage_root, tmp_path / "out", _names())
+    cell_dir = written[parse_stem(STEMS[0])]
+    assert (cell_dir / f"specimen_space_reconstructions/refined/{STEMS[0]}.swc").is_file()
+    assert (cell_dir / f"specimen_space_reconstructions/resampled/{STEMS[0]}.swc").is_file()

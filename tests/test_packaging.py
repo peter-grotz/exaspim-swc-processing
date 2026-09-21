@@ -23,6 +23,7 @@ RESOURCES = Path(__file__).parent / "resources"
 STEMS = ("N001-794492-HP", "N003-794492-JG")
 STAGE_FILES = {
     "refinement/final-voxel": ".swc",
+    "refinement/final-voxel-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
     "final/ccf_space_reconstructions/jsons": ".json",
 }
@@ -236,7 +237,7 @@ def test_reconstructions_are_written_alongside_the_metadata(
     result = _package(stage_root, tmp_path)
     cell = result.packaged[0]
     stem = cell.reconstruction.stem
-    assert (cell.directory / f"specimen_space_reconstructions/swc/{stem}.swc").is_file()
+    assert (cell.directory / f"specimen_space_reconstructions/refined/{stem}.swc").is_file()
     assert (cell.directory / f"ccf_space_reconstructions/{stem}.swc").is_file()
 
 
