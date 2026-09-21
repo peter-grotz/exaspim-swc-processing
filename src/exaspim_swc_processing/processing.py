@@ -29,24 +29,29 @@ class ProcessingAssemblyError(ValueError):
 
 
 def linear_dependency_graph(processes: Sequence[DataProcess]) -> dict[str, list[str]]:
-    """Build a dependency graph chaining processes in the order given.
+    """Build a dependency graph chaining processes in chronological order.
 
     The pipeline is a linear chain, so each process depends on the one before it. Pass an
     explicit graph instead if a stage ever fans out.
 
+    Ordering is taken from ``start_date_time`` rather than the order the caller supplied.
+    :class:`~aind_data_schema.core.processing.Processing` re-sorts ``data_processes``
+    chronologically on validation, so a graph built from the caller's order would silently
+    disagree with the record it is attached to, describing a chain that runs backwards.
+
     Parameters
     ----------
     processes : Sequence[DataProcess]
-        Processes in execution order.
+        Processes to chain, in any order.
 
     Returns
     -------
     dict[str, list[str]]
-        Mapping of each process name to the names of its inputs. The first has none.
+        Mapping of each process name to the names of its inputs. The earliest has none.
     """
     graph: dict[str, list[str]] = {}
     previous: str | None = None
-    for process in processes:
+    for process in sorted(processes, key=lambda item: item.start_date_time):
         graph[process.name] = [previous] if previous is not None else []
         previous = process.name
     return graph

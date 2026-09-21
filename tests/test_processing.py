@@ -136,3 +136,23 @@ def test_linear_dependency_graph_on_a_single_process() -> None:
     """A lone process depends on nothing."""
     processes = _stage_processes()[:1]
     assert linear_dependency_graph(processes) == {"SWC merge and validation": []}
+
+
+def test_graph_is_chronological_regardless_of_input_order() -> None:
+    """A caller supplying processes out of order must not invert the provenance.
+
+    ``Processing`` re-sorts ``data_processes`` by ``start_date_time``, so a graph built
+    from the caller's order would describe a chain running backwards in time.
+    """
+    processes = _stage_processes()
+    result = build_cell_processing(list(reversed(processes)), PIPELINE)
+    assert result.dependency_graph == {
+        "SWC merge and validation": [],
+        "Neuron skeleton processing": ["SWC merge and validation"],
+        "exaspim_swc_transform": ["Neuron skeleton processing"],
+        "aligned_swc_processing": ["exaspim_swc_transform"],
+    }
+    ordered = [process.name for process in result.data_processes]
+    for name, inputs in result.dependency_graph.items():
+        for dependency in inputs:
+            assert ordered.index(dependency) < ordered.index(name)
