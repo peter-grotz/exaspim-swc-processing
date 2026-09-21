@@ -1,10 +1,16 @@
 """Regroup pipeline stage outputs into one directory per reconstruction.
 
 The pipeline stages each write a flat directory holding every neuron of a subject, so the
-outputs for a single cell are scattered across nine directories that share only the file
+outputs for a single cell are scattered across several directories that share only the file
 stem. This module inverts that: it indexes the stage outputs by
 :class:`~exaspim_swc_processing.naming.ReconstructionId` and materialises one self-contained
 directory per cell, laid out as an AIND derived data asset.
+
+Specimen-space reconstructions are published in **voxel** coordinates only. The upstream
+``final-world`` outputs are not carried: they are the same points scaled by the acquisition's
+``coordinate_transformations`` (``[0.748, 0.748, 1.0]`` for exaSPIM_794492, anisotropic and
+per-acquisition), so publishing both would duplicate the data. Convert where physical units
+are needed.
 
 Stage outputs are never modified; artifacts are hardlinked where the filesystem allows it and
 copied otherwise, so a run costs little beyond the directory entries.
@@ -89,14 +95,9 @@ def _spec(
 
 ARTIFACT_SPECS: tuple[ArtifactSpec, ...] = (
     _spec(
-        "specimen_voxel",
+        "specimen",
         ("refinement/final-voxel", "swc_refinement/final-voxel", "final-voxel"),
-        "specimen_space_reconstructions/voxel",
-    ),
-    _spec(
-        "specimen_physical",
-        ("refinement/final-world", "swc_refinement/final-world", "final-world"),
-        "specimen_space_reconstructions/physical",
+        "specimen_space_reconstructions/swc",
     ),
     _spec(
         "ccf",
