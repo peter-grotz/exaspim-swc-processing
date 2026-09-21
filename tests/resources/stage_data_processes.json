@@ -1,0 +1,238 @@
+[
+  {
+    "object_type": "Data process",
+    "process_type": "Neuron skeleton processing",
+    "name": "SWC merge and validation",
+    "stage": "Processing",
+    "code": {
+      "object_type": "Code",
+      "url": "https://codeocean.allenneuraldynamics.org/capsule/3397866",
+      "name": "SWC Refinement - Dispatch",
+      "version": "0ecc712122811c7d59346b66470a8817433eb13a",
+      "container": null,
+      "run_script": "code/run",
+      "language": "Python",
+      "language_version": "3.10.12",
+      "input_data": null,
+      "parameters": {
+        "swc_dir": "/data",
+        "image_path": "s3://aind-open-data/exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16/fusion/fused.zarr",
+        "merge_output_dir": "/results/merged",
+        "validated_swc_output_dir": "/results/dispatch/swcs",
+        "mip_output_dir": "/results/dispatch/mips",
+        "standard_morph_fail_errors": [
+          "AxonOrigins",
+          "CheckForLoops",
+          "DendriteOrigins",
+          "NumberOfSomas",
+          "OrphanedNodes"
+        ]
+      },
+      "core_dependency": null
+    },
+    "experimenters": [
+      "Cameron Arshadi"
+    ],
+    "pipeline_name": null,
+    "start_date_time": "2026-08-19T16:49:41.100674Z",
+    "end_date_time": "2026-08-19T16:50:52.815014Z",
+    "output_path": "/results/dispatch",
+    "output_parameters": {
+      "report_html": "/results/dispatch/report.html",
+      "swc_dir": "/results/dispatch/swcs",
+      "mips_dir": "/results/dispatch/mips",
+      "merged_dir": "/results/merged"
+    },
+    "notes": null,
+    "resources": null
+  },
+  {
+    "object_type": "Data process",
+    "process_type": "Neuron skeleton processing",
+    "name": "Neuron skeleton processing",
+    "stage": "Processing",
+    "code": {
+      "object_type": "Code",
+      "url": "https://codeocean.allenneuraldynamics.org/capsule/1168512",
+      "name": "swc-refinement",
+      "version": "018e1ad8e2cef1aea8a1e9d27969cdc51fea3da1",
+      "container": null,
+      "run_script": "code/run",
+      "language": "Python",
+      "language_version": "3.10.12",
+      "input_data": null,
+      "parameters": {
+        "image_path": "s3://aind-open-data/exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16/fusion/fused.zarr",
+        "swc_dir": "/data",
+        "voxel_size": [
+          0.748,
+          0.748,
+          1.0
+        ],
+        "cost": "relative_difference"
+      },
+      "core_dependency": null
+    },
+    "experimenters": [
+      "Cameron Arshadi"
+    ],
+    "pipeline_name": null,
+    "start_date_time": "2026-08-19T16:52:58.375206Z",
+    "end_date_time": "2026-08-19T17:21:25.945823Z",
+    "output_path": "/results/N001-794492-HP_refinement",
+    "output_parameters": {
+      "intermediate_dirs": [
+        "voxel",
+        "fixed",
+        "refined",
+        "astar"
+      ],
+      "output_dirs": [
+        "final-world",
+        "final-voxel"
+      ]
+    },
+    "notes": "SWC refinement run completed successfully.",
+    "resources": {
+      "object_type": "Resource usage",
+      "os": "Linux 6.1.177-224.371.amzn2023.x86_64",
+      "architecture": "x86_64",
+      "cpu": "x86_64",
+      "cpu_cores": 48,
+      "gpu": null,
+      "system_memory": null,
+      "system_memory_unit": null,
+      "ram": null,
+      "ram_unit": null,
+      "cpu_usage": null,
+      "gpu_usage": null,
+      "ram_usage": null,
+      "usage_unit": "percent"
+    }
+  },
+  {
+    "object_type": "Data process",
+    "process_type": "Neuron skeleton processing",
+    "name": "exaspim_swc_transform",
+    "stage": "Processing",
+    "code": {
+      "object_type": "Code",
+      "url": "https://codeocean.allenneuraldynamics.org/capsule/7989393",
+      "name": "exaspim-swc-transform",
+      "version": "385ad5a541786643fc35b30df76b0aed0f080abb",
+      "container": null,
+      "run_script": "code/run.py",
+      "language": "Python",
+      "language_version": "3.10.9",
+      "input_data": null,
+      "parameters": {
+        "swc_dir": "/data/exaSPIM_794492_reconstructions_refined_2026_08_19/refinement/final-world",
+        "processed_dataset": "s3://aind-open-data/exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16/ccf_alignment/",
+        "df_asset": "/data/exaSPIM_794492_displacement_field",
+        "transform_dir": "/scratch/reg_bundle",
+        "manual_df_path": "/data/exaSPIM_794492_displacement_field/794492_manual_displacement_field.nrrd",
+        "manual_df_filename": "",
+        "dataset_id": "",
+        "acquisition_file_path": "",
+        "loaded_zarr_image_path": "",
+        "resampled_zarr_image_path": "",
+        "sample_to_exaspim_affine_path": "",
+        "sample_to_exaspim_inverse_warp_path": "",
+        "exaspim_to_ccf_affine_path": "/data/reg_exaspim_template_to_ccf_25um_v1.5/0GenericAffine.mat",
+        "exaspim_to_ccf_inverse_warp_path": "/data/reg_exaspim_template_to_ccf_25um_v1.5/1InverseWarp.nii.gz",
+        "ccf_template_path": "/data/allen_mouse_ccf/average_template/average_template_10.nii.gz",
+        "exaspim_template_path": "/data/exaspim_template_7subjects_nomask_10um_round6_template_only/fixed_median.nii.gz"
+      },
+      "core_dependency": null
+    },
+    "experimenters": [
+      "MSMA Team"
+    ],
+    "pipeline_name": null,
+    "start_date_time": "2026-08-19T22:10:02.767383Z",
+    "end_date_time": "2026-08-20T03:27:08.356774Z",
+    "output_path": "/results/alignment",
+    "output_parameters": {
+      "output_root": "/results/alignment",
+      "aligned_swc_dir": "/results/alignment/aligned_swcs",
+      "input_swc_count": 58,
+      "transformed_swc_count": 58,
+      "resolved_dataset_id": "794492"
+    },
+    "notes": "Alignment run completed successfully.",
+    "resources": {
+      "object_type": "Resource usage",
+      "os": "Linux 6.1.177-224.371.amzn2023.x86_64",
+      "architecture": "x86_64",
+      "cpu": "x86_64",
+      "cpu_cores": 32,
+      "gpu": null,
+      "system_memory": null,
+      "system_memory_unit": null,
+      "ram": null,
+      "ram_unit": null,
+      "cpu_usage": null,
+      "gpu_usage": null,
+      "ram_usage": null,
+      "usage_unit": "percent"
+    }
+  },
+  {
+    "object_type": "Data process",
+    "process_type": "Neuron skeleton processing",
+    "name": "aligned_swc_processing",
+    "stage": "Processing",
+    "code": {
+      "object_type": "Code",
+      "url": "https://codeocean.allenneuraldynamics.org/capsule/6437495",
+      "name": "aligned-swc-processing",
+      "version": "038556492fe9e0d3d2a289839fff0c986ad327bb",
+      "container": null,
+      "run_script": "code/run",
+      "language": "Python",
+      "language_version": "3.10.12",
+      "input_data": null,
+      "parameters": {
+        "input_swc_dir": "/results/aligned_resampled",
+        "output_swc_dir": "/results/final/ccf_space_reconstructions/swcs",
+        "output_json_dir": "/results/final/ccf_space_reconstructions/jsons",
+        "workers": 8,
+        "ccf_resolution_um": 10,
+        "fail_fast": true
+      },
+      "core_dependency": null
+    },
+    "experimenters": [
+      "MSMA Team"
+    ],
+    "pipeline_name": null,
+    "start_date_time": "2026-08-20T03:45:13.306551Z",
+    "end_date_time": "2026-08-20T03:47:57.139696Z",
+    "output_path": "/results/final",
+    "output_parameters": {
+      "output_swc_dir": "/results/final/ccf_space_reconstructions/swcs",
+      "output_json_dir": "/results/final/ccf_space_reconstructions/jsons",
+      "swc_outputs": 0,
+      "json_outputs": 58,
+      "manual_alignment_images": 0,
+      "failures": []
+    },
+    "notes": "Aligned SWC processing completed successfully.",
+    "resources": {
+      "object_type": "Resource usage",
+      "os": "Linux 6.1.177-224.371.amzn2023.x86_64",
+      "architecture": "x86_64",
+      "cpu": "x86_64",
+      "cpu_cores": 128,
+      "gpu": null,
+      "system_memory": null,
+      "system_memory_unit": null,
+      "ram": null,
+      "ram_unit": null,
+      "cpu_usage": null,
+      "gpu_usage": null,
+      "ram_usage": null,
+      "usage_unit": "percent"
+    }
+  }
+]
