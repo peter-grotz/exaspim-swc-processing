@@ -21,7 +21,6 @@ STEMS = ("N001-794492-HP", "N003-794492-JG")
 
 STAGE_FILES = {
     "refinement/final-voxel": ".swc",
-    "refinement/final-world": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
     "final/ccf_space_reconstructions/jsons": ".json",
     "dispatch/swcs": ".swc",
@@ -82,7 +81,7 @@ def test_discover_cells_warns_and_skips_unparseable_names(
     stage_root: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A stray file that is not a reconstruction is skipped rather than aborting the scan."""
-    (stage_root / "refinement/final-world/notes.swc").write_text("x", encoding="utf-8")
+    (stage_root / "refinement/final-voxel/notes.swc").write_text("x", encoding="utf-8")
     with caplog.at_level(logging.WARNING):
         cells = discover_cells(stage_root)
     assert [identifier.stem for identifier in cells] == list(STEMS)
@@ -116,8 +115,8 @@ def test_missing_roles_reports_only_required_artifacts(stage_root: Path) -> None
 
 def test_resolve_source_dir_prefers_the_first_existing_candidate(stage_root: Path) -> None:
     """Candidate source directories are tried in priority order."""
-    spec = next(spec for spec in ARTIFACT_SPECS if spec.role == "specimen_physical")
-    assert resolve_source_dir(stage_root, spec) == stage_root / "refinement/final-world"
+    spec = next(spec for spec in ARTIFACT_SPECS if spec.role == "specimen")
+    assert resolve_source_dir(stage_root, spec) == stage_root / "refinement/final-voxel"
 
 
 def test_resolve_source_dir_returns_none_when_no_candidate_exists(tmp_path: Path) -> None:
@@ -193,8 +192,7 @@ def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: 
     cell_dir = written[parse_stem(stem)]
     assert cell_dir == output_root / f"asset_{stem}"
     for relative in (
-        f"specimen_space_reconstructions/voxel/{stem}.swc",
-        f"specimen_space_reconstructions/physical/{stem}.swc",
+        f"specimen_space_reconstructions/swc/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.json",
         f"source_reconstructions/raw/{stem}.swc",
