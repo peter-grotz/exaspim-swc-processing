@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 6243d25
+_src_path: /tmp/_tmpl
+author_name: Peter Grotz
+initial_version: 0.0.0
+level_of_support: Supported
+max_python_target_version: '3.13'
+min_python_target_version: '3.12'
+package_name: exaspim_swc_processing
+project_created_date: '2026-09-21'
+project_description: Processing and packaging of exaSPIM neuron SWC reconstructions
+    into per-cell AIND derived data assets.
+project_name: exaspim-swc-processing
+project_url: https://github.com/peter-grotz/exaspim-swc-processing
+release_type: GitHub
+repo_visibility: private
+template_type: library-template
+

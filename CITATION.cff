@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- given-names: "Peter Grotz"
+title: "exaspim-swc-processing"
+version: "v0.0.0"
+date-released: 2026-09-21
+url: "https://github.com/peter-grotz/exaspim-swc-processing"

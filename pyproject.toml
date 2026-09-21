@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "exaspim-swc-processing"
+description = "Processing and packaging of exaSPIM neuron SWC reconstructions into per-cell AIND derived data assets."
+license = "MIT"
+requires-python = ">=3.12,<3.14"
+authors = [
+    {name = "Peter Grotz"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+readme = "README.md"
+version = "0.0.0"
+
+dependencies = [
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.20,<1.0.0",
+    "pytest-cov>=7.1.0,<8.0.0",
+    "interrogate>=1.7.0,<2.0.0"
+]
+docs = [
+    "Sphinx>=9.1.0,<10.0.0",
+    "furo==2025.12.19"
+]
+
+[tool.uv.dependency-groups]
+docs = { requires-python = ">=3.12" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/exaspim_swc_processing"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+    "^from .* import .*",
+    "^import .*",
+    "pragma: no cover"
+]
+fail_under = 100
+
+[tool.ruff]
+preview = true
+src = ["src", "tests"]
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "docs"
+]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["I", "E", "F", "W", "ANN", "W505", "D", "DOC"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 100
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.interrogate]
+ignore-init-methods = true
+ignore-init-module = true
+exclude = ["docs", "build", ".conda", ".venv", "env"]
+fail-under = 100
+
