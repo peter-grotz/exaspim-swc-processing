@@ -252,3 +252,20 @@ def test_parent_metadata_is_frozen() -> None:
     assert isinstance(result, ParentMetadata)
     with pytest.raises(AttributeError):
         result.source = MetadataSource.S3  # type: ignore[misc]
+
+
+def test_a_future_schema_is_left_alone() -> None:
+    """A document newer than the current major is not pushed through the upgrader."""
+    result = resolve_parent_metadata(
+        ASSET, [(MetadataSource.DOCDB_V2, _found(_document(schema_version="3.0.0")))], _upgrade
+    )
+    assert result.upgraded is False
+    assert result.source_schema_version == "3.0.0"
+
+
+def test_an_unparseable_schema_version_is_treated_as_old() -> None:
+    """A malformed version is upgraded rather than trusted."""
+    result = resolve_parent_metadata(
+        ASSET, [(MetadataSource.S3, _found(_document(schema_version="unknown")))], _upgrade
+    )
+    assert result.upgraded is True

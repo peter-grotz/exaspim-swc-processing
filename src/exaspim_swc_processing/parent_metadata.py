@@ -106,8 +106,16 @@ Upgrader = Callable[[dict], dict]
 """Upgrades a raw ``data_description`` document to the current schema."""
 
 
+MINIMUM_CURRENT_MAJOR = 2
+"""Major ``schema_version`` at or above which a document needs no upgrade."""
+
+
 def _is_current_schema(document: dict) -> bool:
-    """Report whether a raw document is already at schema v2.
+    """Report whether a raw document is new enough to use without upgrading.
+
+    Compares the major version rather than matching ``"2."``, so a document written
+    against a future schema is left alone rather than pushed through an upgrader that
+    only knows how to move forwards.
 
     Parameters
     ----------
@@ -117,9 +125,13 @@ def _is_current_schema(document: dict) -> bool:
     Returns
     -------
     bool
-        ``True`` if its ``schema_version`` starts with ``"2."``.
+        ``True`` if the major ``schema_version`` is at least
+        :data:`MINIMUM_CURRENT_MAJOR`. A missing or unparseable version is treated as old.
     """
-    return str(document.get("schema_version", "")).startswith("2.")
+    major, _, _ = str(document.get("schema_version", "")).partition(".")
+    if not major.isdigit():
+        return False
+    return int(major) >= MINIMUM_CURRENT_MAJOR
 
 
 def resolve_parent_metadata(
