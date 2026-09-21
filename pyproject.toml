@@ -17,6 +17,7 @@ readme = "README.md"
 version = "0.0.0"
 
 dependencies = [
+    "aind-data-schema>=2.5.0,<3",
 ]
 
 [dependency-groups]
