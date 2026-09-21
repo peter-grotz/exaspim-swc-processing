@@ -1,0 +1,98 @@
+{
+  "object_type": "Data description",
+  "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/data_description.py",
+  "schema_version": "2.4.1",
+  "license": "CC-BY-4.0",
+  "subject_id": "794492",
+  "creation_time": "2026-01-09 16:50:40-08:00",
+  "tags": null,
+  "name": "exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16",
+  "institution": {
+    "name": "Allen Institute for Neural Dynamics",
+    "abbreviation": "AIND",
+    "registry": "Research Organization Registry (ROR)",
+    "registry_identifier": "04szwah67"
+  },
+  "funding_source": [
+    {
+      "object_type": "Funding",
+      "funder": {
+        "name": "Allen Institute",
+        "abbreviation": "AI",
+        "registry": "Research Organization Registry (ROR)",
+        "registry_identifier": "03cpe7c52"
+      },
+      "grant_number": null,
+      "fundee": [
+        {
+          "object_type": "Person",
+          "name": "Jayaram Chandrashekar",
+          "registry": "Open Researcher and Contributor ID (ORCID)",
+          "registry_identifier": null
+        }
+      ]
+    },
+    {
+      "object_type": "Funding",
+      "funder": {
+        "name": "National Institute of Neurological Disorders and Stroke",
+        "abbreviation": "NINDS",
+        "registry": "Research Organization Registry (ROR)",
+        "registry_identifier": "01s5ya894"
+      },
+      "grant_number": "1U19NS123714-01",
+      "fundee": [
+        {
+          "object_type": "Person",
+          "name": "Jayaram Chandrashekar",
+          "registry": "Open Researcher and Contributor ID (ORCID)",
+          "registry_identifier": null
+        }
+      ]
+    },
+    {
+      "object_type": "Funding",
+      "funder": {
+        "name": "National Institute of Neurological Disorders and Stroke",
+        "abbreviation": "NINDS",
+        "registry": "Research Organization Registry (ROR)",
+        "registry_identifier": "01s5ya894"
+      },
+      "grant_number": "1RF1MH128841-01",
+      "fundee": [
+        {
+          "object_type": "Person",
+          "name": "Jayaram Chandrashekar",
+          "registry": "Open Researcher and Contributor ID (ORCID)",
+          "registry_identifier": null
+        },
+        {
+          "object_type": "Person",
+          "name": "Karel Svoboda",
+          "registry": "Open Researcher and Contributor ID (ORCID)",
+          "registry_identifier": null
+        }
+      ]
+    }
+  ],
+  "data_level": "raw",
+  "group": null,
+  "investigators": [
+    {
+      "object_type": "Person",
+      "name": "Jayaram Chandrashekar",
+      "registry": "Open Researcher and Contributor ID (ORCID)",
+      "registry_identifier": null
+    }
+  ],
+  "project_name": "MSMA Platform",
+  "restrictions": null,
+  "modalities": [
+    {
+      "name": "Selective plane illumination microscopy",
+      "abbreviation": "SPIM"
+    }
+  ],
+  "source_data": null,
+  "data_summary": "The following files have been archived or deleted: exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16/denoised/SPIM.ome.zarr, exaSPIM_794492_2026-01-09_16-50-40_processed_2026-01-17_14-44-16/flatfield_correction/SPIM.ome.zarr"
+}
