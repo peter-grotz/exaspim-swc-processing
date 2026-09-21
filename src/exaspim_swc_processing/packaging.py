@@ -44,6 +44,9 @@ logger = logging.getLogger(__name__)
 PACKAGING_STEP_NAME = "exaspim_swc_packaging"
 """``DataProcess.name`` of the step this module performs."""
 
+DEFAULT_EXPERIMENTERS = ("MSMA Team",)
+"""Default ``DataProcess.experimenters`` for the packaging step."""
+
 DATA_DESCRIPTION_FILENAME = "data_description.json"
 PROCESSING_FILENAME = "processing.json"
 
@@ -107,7 +110,7 @@ def build_packaging_process(
     end_time: datetime,
     output_path: str,
     cell_count: int,
-    experimenters: Sequence[str] = (),
+    experimenters: Sequence[str] = DEFAULT_EXPERIMENTERS,
 ) -> DataProcess:
     """Describe the packaging step itself.
 
@@ -126,7 +129,7 @@ def build_packaging_process(
     cell_count : int
         Number of cells packaged in the run.
     experimenters : Sequence[str], optional
-        Who is responsible for the run. Empty by default: the step is automated.
+        Who is responsible for the run, by default :data:`DEFAULT_EXPERIMENTERS`.
 
     Returns
     -------

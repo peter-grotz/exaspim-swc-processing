@@ -283,3 +283,18 @@ def test_packaging_process_records_the_output_path() -> None:
     assert str(step.output_path) == "cells"
     assert step.process_type == "Other"
     assert step.notes
+    assert step.experimenters == ["MSMA Team"]
+
+
+def test_experimenters_can_be_overridden() -> None:
+    """A run attributable to a person records that person."""
+    step = build_packaging_process(
+        _parent(),
+        PACKAGER,
+        start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
+        end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
+        output_path="cells",
+        cell_count=2,
+        experimenters=["Peter Grotz"],
+    )
+    assert step.experimenters == ["Peter Grotz"]
