@@ -1,0 +1,300 @@
+"""Tests for :mod:`exaspim_swc_processing.packaging`."""
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+from aind_data_schema.components.identifiers import Code
+from aind_data_schema.core.data_description import DataDescription
+from aind_data_schema.core.metadata import Metadata
+from aind_data_schema.core.processing import DataProcess, Processing
+
+from exaspim_swc_processing.packaging import (
+    DATA_DESCRIPTION_FILENAME,
+    PACKAGING_STEP_NAME,
+    PROCESSING_FILENAME,
+    build_packaging_process,
+    package_cells,
+)
+from exaspim_swc_processing.parent_metadata import MetadataSource, ParentMetadata
+
+RESOURCES = Path(__file__).parent / "resources"
+STEMS = ("N001-794492-HP", "N003-794492-JG")
+STAGE_FILES = {
+    "refinement/final-voxel": ".swc",
+    "final/ccf_space_reconstructions/swcs": ".swc",
+    "final/ccf_space_reconstructions/jsons": ".json",
+    "dispatch/swcs": ".swc",
+    "dispatch/merged": ".swc",
+}
+CREATION_TIME = datetime(2026, 8, 19, 22, 10, 2, tzinfo=timezone.utc)
+PIPELINE = Code(
+    url="https://github.com/peter-grotz/exaspim-swc-processing-pipeline",
+    name="exaspim-swc-processing",
+    version="0.1.0",
+)
+PACKAGER = Code(
+    url="https://github.com/peter-grotz/exaspim-swc-processing",
+    name="exaspim-swc-processing",
+    version="0.1.0",
+)
+
+
+@pytest.fixture
+def stage_root(tmp_path: Path) -> Path:
+    """Build a stage-output tree holding two complete cells.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Pytest-provided temporary directory.
+
+    Returns
+    -------
+    Path
+        Root of the generated tree.
+    """
+    root = tmp_path / "stages"
+    for relative, suffix in STAGE_FILES.items():
+        directory = root / relative
+        directory.mkdir(parents=True)
+        for stem in STEMS:
+            (directory / f"{stem}{suffix}").write_text(f"{relative}:{stem}", encoding="utf-8")
+    return root
+
+
+def _parent(source: MetadataSource = MetadataSource.S3, upgraded: bool = True) -> ParentMetadata:
+    """Build resolved parent metadata from the real fixture.
+
+    Parameters
+    ----------
+    source : MetadataSource, optional
+        Which source it came from, by default S3.
+    upgraded : bool, optional
+        Whether it was upgraded locally, by default True.
+
+    Returns
+    -------
+    ParentMetadata
+        The resolved parent.
+    """
+    payload = json.loads((RESOURCES / "parent_data_description.json").read_text(encoding="utf-8"))
+    return ParentMetadata(
+        data_description=DataDescription.model_validate(payload),
+        asset_name=payload["name"],
+        source=source,
+        source_schema_version="1.0.4" if upgraded else "2.4.1",
+        upgraded=upgraded,
+    )
+
+
+def _stage_processes() -> list[DataProcess]:
+    """Load the pipeline's stage records from a real run.
+
+    Returns
+    -------
+    list[DataProcess]
+        The records in execution order.
+    """
+    payload = json.loads((RESOURCES / "stage_data_processes.json").read_text(encoding="utf-8"))
+    return [DataProcess.model_validate(record) for record in payload]
+
+
+def _packaging_process(parent: ParentMetadata, cells: int = 2) -> DataProcess:
+    """Build the packaging step record.
+
+    Parameters
+    ----------
+    parent : ParentMetadata
+        Resolved parent, supplying provenance.
+    cells : int, optional
+        Number of cells packaged, by default 2.
+
+    Returns
+    -------
+    DataProcess
+        The step record.
+    """
+    return build_packaging_process(
+        parent,
+        PACKAGER,
+        start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
+        end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
+        output_path="cells",
+        cell_count=cells,
+    )
+
+
+def _package(stage_root: Path, tmp_path: Path, **kwargs: object) -> object:
+    """Package the fixture tree with default arguments.
+
+    Parameters
+    ----------
+    stage_root : Path
+        Stage output tree.
+    tmp_path : Path
+        Temporary directory.
+    **kwargs : object
+        Overrides passed to :func:`package_cells`.
+
+    Returns
+    -------
+    object
+        The packaging result.
+    """
+    parent = kwargs.pop("parent", None) or _parent()
+    return package_cells(
+        stage_root,
+        tmp_path / "out",
+        parent,
+        _stage_processes(),
+        PIPELINE,
+        CREATION_TIME,
+        _packaging_process(parent),
+        **kwargs,
+    )
+
+
+def test_each_cell_gets_its_own_directory(stage_root: Path, tmp_path: Path) -> None:
+    """One derived asset directory per reconstruction."""
+    result = _package(stage_root, tmp_path)
+    assert len(result.packaged) == len(STEMS)
+    assert result.skipped == ()
+    names = {cell.asset_name for cell in result.packaged}
+    assert names == {
+        "exaSPIM_794492_2026-01-09_16-50-40_reconstruction-N001_2026-08-19_22-10-02",
+        "exaSPIM_794492_2026-01-09_16-50-40_reconstruction-N003_2026-08-19_22-10-02",
+    }
+
+
+def test_exactly_two_metadata_files_are_written(stage_root: Path, tmp_path: Path) -> None:
+    """Only data_description and processing; no subject, procedures or QC."""
+    result = _package(stage_root, tmp_path)
+    directory = result.packaged[0].directory
+    written = {path.name for path in directory.iterdir() if path.is_file()}
+    assert written == {DATA_DESCRIPTION_FILENAME, PROCESSING_FILENAME}
+
+
+def test_written_asset_validates_as_metadata(stage_root: Path, tmp_path: Path) -> None:
+    """The two files together form a valid derived asset record."""
+    result = _package(stage_root, tmp_path)
+    directory = result.packaged[0].directory
+    description = DataDescription.model_validate_json(
+        (directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
+    )
+    processing = Processing.model_validate_json(
+        (directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
+    )
+    record = Metadata(
+        name=description.name,
+        location=f"s3://aind-open-data/{description.name}",
+        data_description=description,
+        processing=processing,
+    )
+    assert record.data_description is not None
+    assert record.processing is not None
+
+
+def test_packaging_step_is_recorded_in_each_cell(stage_root: Path, tmp_path: Path) -> None:
+    """The step that produced the directory appears in its own provenance."""
+    result = _package(stage_root, tmp_path)
+    processing = Processing.model_validate_json(
+        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
+    )
+    names = [process.name for process in processing.data_processes]
+    assert PACKAGING_STEP_NAME in names
+    assert processing.dependency_graph[PACKAGING_STEP_NAME] == ["aligned_swc_processing"]
+
+
+def test_metadata_source_is_recorded_in_the_packaging_step(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """Where the parent metadata came from is auditable from the published asset."""
+    result = _package(stage_root, tmp_path)
+    processing = Processing.model_validate_json(
+        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
+    )
+    step = next(p for p in processing.data_processes if p.name == PACKAGING_STEP_NAME)
+    parameters = step.output_parameters.model_dump()
+    assert parameters["metadata_source"] == "s3"
+    assert parameters["upgraded_to"] == "2.4.1"
+    assert parameters["cells_packaged"] == 2
+
+
+def test_fallback_source_is_tagged_for_later_rederivation(stage_root: Path, tmp_path: Path) -> None:
+    """Tags are indexed, so fallback-derived assets can be found and rebuilt."""
+    result = _package(stage_root, tmp_path)
+    description = DataDescription.model_validate_json(
+        (result.packaged[0].directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
+    )
+    assert description.tags == ["metadata-source:s3", "metadata-upgraded"]
+
+
+def test_reconstructions_are_written_alongside_the_metadata(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """The asset holds the data as well as the description of it."""
+    result = _package(stage_root, tmp_path)
+    cell = result.packaged[0]
+    stem = cell.reconstruction.stem
+    assert (cell.directory / f"specimen_space_reconstructions/swc/{stem}.swc").is_file()
+    assert (cell.directory / f"ccf_space_reconstructions/{stem}.swc").is_file()
+
+
+def test_a_cell_whose_description_cannot_be_derived_is_skipped(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """A cell is skipped rather than published without metadata."""
+    parent = _parent()
+    broken = ParentMetadata(
+        data_description=parent.data_description.model_copy(update={"name": "not-an-asset-name"}),
+        asset_name="not-an-asset-name",
+        source=parent.source,
+        source_schema_version=parent.source_schema_version,
+        upgraded=parent.upgraded,
+    )
+    result = _package(stage_root, tmp_path, parent=broken)
+    assert result.packaged == ()
+    assert len(result.skipped) == len(STEMS)
+    assert "not-an-asset-name" in result.skipped[0].reason
+
+
+def test_an_incomplete_cell_is_still_packaged(stage_root: Path, tmp_path: Path) -> None:
+    """A missing required artifact is logged, not fatal; the transform skips failures."""
+    (stage_root / f"final/ccf_space_reconstructions/swcs/{STEMS[0]}.swc").unlink()
+    result = _package(stage_root, tmp_path)
+    assert len(result.packaged) == len(STEMS)
+
+
+def test_overrides_apply_to_every_cell(stage_root: Path, tmp_path: Path) -> None:
+    """Fields supplied as configuration reach all published descriptions."""
+    result = _package(stage_root, tmp_path, overrides={"project_name": "Neuron Reconstruction"})
+    for cell in result.packaged:
+        description = DataDescription.model_validate_json(
+            (cell.directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
+        )
+        assert description.project_name == "Neuron Reconstruction"
+
+
+def test_packaging_process_records_the_output_path() -> None:
+    """The step points at where it wrote."""
+    step = _packaging_process(_parent())
+    assert str(step.output_path) == "cells"
+    assert step.process_type == "Other"
+    assert step.notes
+    assert step.experimenters == ["Peter Grotz"]
+
+
+def test_experimenters_can_be_overridden() -> None:
+    """A run attributable to a person records that person."""
+    step = build_packaging_process(
+        _parent(),
+        PACKAGER,
+        start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
+        end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
+        output_path="cells",
+        cell_count=2,
+        experimenters=["Cameron Arshadi"],
+    )
+    assert step.experimenters == ["Cameron Arshadi"]
