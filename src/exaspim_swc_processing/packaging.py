@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 PACKAGING_STEP_NAME = "exaspim_swc_packaging"
 """``DataProcess.name`` of the step this module performs."""
 
-DEFAULT_EXPERIMENTERS = ("MSMA Team",)
+DEFAULT_EXPERIMENTERS = ("Peter Grotz",)
 """Default ``DataProcess.experimenters`` for the packaging step."""
 
 DATA_DESCRIPTION_FILENAME = "data_description.json"
