@@ -18,6 +18,7 @@ version = "0.0.0"
 
 dependencies = [
     "aind-data-schema>=2.5.0,<3",
+    "aind-metadata-upgrader",
 ]
 
 [dependency-groups]
@@ -33,6 +34,9 @@ docs = [
 
 [tool.uv.dependency-groups]
 docs = { requires-python = ">=3.12" }
+
+[tool.uv.sources]
+aind-metadata-upgrader = { git = "https://github.com/AllenNeuralDynamics/aind-metadata-upgrader.git" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/exaspim_swc_processing"]
