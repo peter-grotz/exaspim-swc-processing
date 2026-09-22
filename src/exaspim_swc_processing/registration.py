@@ -50,6 +50,17 @@ PROCESSING_RECORD = f"{CCF_ALIGNMENT_DIR}/processing.json"
 RESAMPLED_SPACING_MM = (0.01, 0.01, 0.01)
 """Isotropic spacing the registration resamples to, in millimetres."""
 
+WRITTEN_SPACING_MM = {
+    10: (0.010125, 0.010125, 0.0135),
+    25: (0.02025, 0.02025, 0.027),
+}
+"""Spacing the registration writes into a loaded volume's header, by ``resolution_um``.
+
+Fixed per pass in the registration's configuration, not read from the sample. The 10 um
+entry matches all 48 published volumes; the 25 um entry is its configured counterpart and
+is not exercised by the SWC transform.
+"""
+
 ANTS_DIRECTION = (
     (0.0, 0.0, -1.0),
     (1.0, 0.0, 0.0),
@@ -97,7 +108,8 @@ class RegistrationPass:
     resolution_um : int
         Target resolution of the pass, 10 or 25.
     sample_scale_mm : tuple[float, float, float]
-        Voxel size the registration assigned, in ``(z, y, x)`` order as recorded.
+        Voxel size as recorded, kept for provenance. Not used for geometry -- see
+        :attr:`loaded_spacing_mm` for why it cannot be.
     sample_to_template : tuple[str, ...]
         Basenames of the sample-to-template transforms, resolved against
         ``<dataset>/ccf_alignment/``. The recorded paths point at Nextflow scratch.
@@ -117,21 +129,41 @@ class RegistrationPass:
     def loaded_spacing_mm(self) -> tuple[float, float, float]:
         """Spacing the registration wrote into the loaded volume's header.
 
-        ``sample_scale`` is recorded ``(z, y, x)``, coarse axis first, and the written
-        header is simply that reversed. Note this does **not** correspond to the array's
-        physical axes: the volume is stored ``(x, z, y)``, so the coarse value lands on
-        axis 2 while the coarse physical axis is z at index 1. Verified against the real
-        headers of 40 samples, which all record ``(0.010125, 0.010125, 0.0135)``.
+        This is a constant of the pass, not a per-sample quantity: the registration
+        configures a fixed ``sample_scale`` per resolution and writes it after applying
+        the acquisition's axis swaps. All 48 published volumes carry
+        ``(0.010125, 0.010125, 0.0135)``.
 
-        Reproducing this exactly is required, not optional -- the transforms were fit in
-        this space, so a "corrected" spacing would invalidate them.
+        It is deliberately not derived from the recorded ``sample_scale``, which is
+        ambiguous. Some records store the raw configuration (coarse axis first) and
+        others the reordered result, with nothing to distinguish them: 730904 and 826509
+        have identical acquisition axes and therefore identical swaps, yet record
+        ``(0.010125, 0.010125, 0.0135)`` and ``(0.0135, 0.010125, 0.010125)``
+        respectively. Any rule reading that field is wrong for one of them.
+
+        Note the written spacing does not correspond to the array's physical axes: the
+        volume is stored ``(x, z, y)``, so the coarse value lands on axis 2 while the
+        coarse physical axis is z at index 1. Reproducing this exactly is required, not
+        optional -- the transforms were fit in this space, so a "corrected" spacing would
+        invalidate them.
 
         Returns
         -------
         tuple[float, float, float]
             Spacing in millimetres, matching the written array axes.
+
+        Raises
+        ------
+        RegistrationRecordError
+            If no spacing is known for this pass's resolution.
         """
-        return tuple(reversed(self.sample_scale_mm))
+        try:
+            return WRITTEN_SPACING_MM[self.resolution_um]
+        except KeyError:
+            raise RegistrationRecordError(
+                f"No written spacing known for a {self.resolution_um} um pass; "
+                f"known resolutions are {sorted(WRITTEN_SPACING_MM)}"
+            ) from None
 
     @property
     def template_to_ccf_version(self) -> str | None:

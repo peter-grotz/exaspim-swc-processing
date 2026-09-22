@@ -3,6 +3,7 @@
 import gzip
 import json
 import struct
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -50,18 +51,37 @@ def test_the_coarse_pass_can_be_selected_too() -> None:
     result = parse_registration_record(_record(), resolution_um=25)
     assert result.level == 3
     assert result.sample_scale_mm == (0.027, 0.02025, 0.02025)
+    assert result.loaded_spacing_mm == (0.02025, 0.02025, 0.027)
 
 
-def test_written_spacing_is_sample_scale_reversed() -> None:
-    """The header is ``sample_scale`` reversed, matching all 40 real volumes.
+def test_written_spacing_is_a_constant_of_the_pass() -> None:
+    """All 48 published volumes carry this spacing, whatever the record says.
 
     This puts the coarse value on axis 2 although the coarse physical axis is z at
     index 1 -- an upstream quirk that must be reproduced, since the transforms were fit
     in this space.
     """
     result = parse_registration_record(_record())
-    assert result.sample_scale_mm == (0.0135, 0.010125, 0.010125)
     assert result.loaded_spacing_mm == (0.010125, 0.010125, 0.0135)
+
+
+def test_written_spacing_ignores_the_recorded_sample_scale() -> None:
+    """826509 records the raw config order; 730904 records the reordered result.
+
+    Their acquisitions yield identical axis swaps, so no rule reading this field is
+    right for both. The field is kept for provenance only.
+    """
+    result = parse_registration_record(_record())
+    assert result.sample_scale_mm == (0.0135, 0.010125, 0.010125)
+    assert result.loaded_spacing_mm != result.sample_scale_mm
+    assert result.loaded_spacing_mm != tuple(reversed(result.sample_scale_mm))[::-1]
+
+
+def test_a_pass_at_an_unknown_resolution_has_no_spacing() -> None:
+    """Inventing a spacing would silently mis-register; fail instead."""
+    pass_ = replace(parse_registration_record(_record()), resolution_um=17)
+    with pytest.raises(RegistrationRecordError, match="No written spacing"):
+        _ = pass_.loaded_spacing_mm
 
 
 def test_transform_basenames_are_extracted() -> None:
