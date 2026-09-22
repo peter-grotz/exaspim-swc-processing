@@ -313,6 +313,35 @@ def resampled_geometry(loaded: VolumeGeometry) -> VolumeGeometry:
     return VolumeGeometry(shape=shape, spacing_mm=RESAMPLED_SPACING_MM)
 
 
+DATASET_NAME_PATTERN = re.compile(r"exaSPIM_\d+_[\d\-_]+_processed_[\d\-_]+")
+"""Matches a processed dataset name wherever it appears in a path or URI."""
+
+
+def dataset_name(*candidates: str) -> str | None:
+    """Recover the processed dataset name from paths, URIs or a bare name.
+
+    The transform may be pointed at an S3 URI, a dataset name, or a Code Ocean mount
+    holding the same bundle. All three carry the name somewhere in the string.
+
+    Parameters
+    ----------
+    *candidates : str
+        Strings to search, in priority order.
+
+    Returns
+    -------
+    str | None
+        The first dataset name found, or ``None``.
+    """
+    for candidate in candidates:
+        if not candidate:
+            continue
+        match = DATASET_NAME_PATTERN.search(candidate)
+        if match:
+            return match.group(0)
+    return None
+
+
 def zarr_level_key(pass_: RegistrationPass) -> str:
     """Key of the ``.zarray`` describing the level the registration read.
 

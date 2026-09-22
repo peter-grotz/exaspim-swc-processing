@@ -13,6 +13,7 @@ from exaspim_swc_processing.registration import (
     NIFTI_HEADER_SIZE,
     RegistrationRecordError,
     VolumeGeometry,
+    dataset_name,
     loaded_geometry,
     parse_nifti_geometry,
     parse_registration_record,
@@ -301,3 +302,28 @@ def test_a_missing_zarr_shape_is_rejected() -> None:
     """An absent key is an error, not an empty shape."""
     with pytest.raises(RegistrationRecordError, match="does not describe a volume"):
         zarr_shape({})
+
+
+def test_the_dataset_name_is_found_in_an_s3_uri() -> None:
+    """The transform is usually pointed at the bundle, not the dataset root."""
+    assert dataset_name(f"s3://aind-open-data/{DATASET}/ccf_alignment/") == DATASET
+
+
+def test_the_dataset_name_is_found_in_a_mounted_path() -> None:
+    """A Code Ocean mount carries the same name; S3 resolution cannot parse a path."""
+    assert dataset_name(f"/data/{DATASET}/ccf_alignment") == DATASET
+
+
+def test_a_bare_dataset_name_passes_through() -> None:
+    """The name itself is already the answer."""
+    assert dataset_name(DATASET) == DATASET
+
+
+def test_candidates_are_tried_in_order() -> None:
+    """Empty or unhelpful candidates fall through to the next."""
+    assert dataset_name("", "/scratch/reg_bundle", f"/data/{DATASET}") == DATASET
+
+
+def test_no_dataset_name_yields_none() -> None:
+    """A caller must be able to tell that nothing was found."""
+    assert dataset_name("/scratch/reg_bundle", "") is None
