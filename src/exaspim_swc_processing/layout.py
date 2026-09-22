@@ -6,11 +6,15 @@ stem. This module inverts that: it indexes the stage outputs by
 :class:`~exaspim_swc_processing.naming.ReconstructionId` and materialises one self-contained
 directory per cell, laid out as an AIND derived data asset.
 
-Specimen-space reconstructions are published in **voxel** coordinates only. The upstream
-``final-world`` outputs are not carried: they are the same points scaled by the acquisition's
-``coordinate_transformations`` (``[0.748, 0.748, 1.0]`` for exaSPIM_794492, anisotropic and
-per-acquisition), so publishing both would duplicate the data. Convert where physical units
-are needed.
+Specimen-space reconstructions are published in **voxel** coordinates only, at two
+densities: ``refined`` is the full-resolution tracing (roughly one node per voxel) and
+``resampled`` is the sparser form produced alongside the CCF resampling. The upstream
+``final-world`` outputs are not carried: they are the same points scaled by the
+acquisition's ``coordinate_transformations`` (``[0.748, 0.748, 1.0]`` for exaSPIM_794492,
+anisotropic and per-acquisition), so publishing both would duplicate the data. Convert
+where physical units are needed.
+
+``specimen_resampled`` is optional until the resample stage produces it; see issue #5.
 
 Stage outputs are never modified; artifacts are hardlinked where the filesystem allows it and
 copied otherwise, so a run costs little beyond the directory entries.
@@ -95,9 +99,15 @@ def _spec(
 
 ARTIFACT_SPECS: tuple[ArtifactSpec, ...] = (
     _spec(
-        "specimen",
+        "specimen_refined",
         ("refinement/final-voxel", "swc_refinement/final-voxel", "final-voxel"),
-        "specimen_space_reconstructions/swc",
+        "specimen_space_reconstructions/refined",
+    ),
+    _spec(
+        "specimen_resampled",
+        ("refinement/final-voxel-resampled", "specimen_resampled"),
+        "specimen_space_reconstructions/resampled",
+        required=False,
     ),
     _spec(
         "ccf",
