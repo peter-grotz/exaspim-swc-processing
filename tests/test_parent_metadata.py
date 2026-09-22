@@ -1,6 +1,7 @@
 """Tests for :mod:`exaspim_swc_processing.parent_metadata`."""
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -269,3 +270,26 @@ def test_an_unparseable_schema_version_is_treated_as_old() -> None:
         ASSET, [(MetadataSource.S3, _found(_document(schema_version="unknown")))], _upgrade
     )
     assert result.upgraded is True
+
+
+def test_a_document_naming_the_raw_asset_is_corrected(caplog: pytest.LogCaptureFixture) -> None:
+    """ExaSPIM _processed_ assets carry the raw asset's name in their data_description.
+
+    Deriving a child from the raw-form name fails, because the original input cannot be
+    parsed out of it, so the name the asset was fetched under wins.
+    """
+    raw_named = _document(name="exaSPIM_794492_2026-01-09_16-50-40")
+    with caplog.at_level(logging.INFO):
+        result = resolve_parent_metadata(
+            ASSET, [(MetadataSource.DOCDB_V1, _found(raw_named))], _upgrade
+        )
+    assert result.data_description.name == ASSET
+    assert "using the latter" in caplog.text
+
+
+def test_a_document_already_naming_the_asset_is_left_alone() -> None:
+    """No correction when the document and the asset agree."""
+    result = resolve_parent_metadata(
+        ASSET, [(MetadataSource.DOCDB_V2, _found(_document()))], _upgrade
+    )
+    assert result.data_description.name == ASSET

@@ -17,11 +17,14 @@ found and re-derived once the upstream registration catches up. See
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
 
 from aind_data_schema.core.data_description import DataDescription
+
+logger = logging.getLogger(__name__)
 
 TAG_PREFIX = "metadata-source"
 """Prefix of the ``data_description`` tag naming the source."""
@@ -134,6 +137,37 @@ def _is_current_schema(document: dict) -> bool:
     return int(major) >= MINIMUM_CURRENT_MAJOR
 
 
+def _with_asset_name(payload: dict, asset_name: str) -> dict:
+    """Return ``payload`` with its ``name`` set to the asset it was fetched for.
+
+    exaSPIM ``_processed_`` assets carry the *raw* asset's name in their
+    ``data_description``, so the document disagrees with the asset it describes. Deriving
+    a child from the raw-form name fails, because the original input cannot be parsed out
+    of it. The name we asked for is the authoritative one; ``aind-metadata-upgrader``
+    resolves the same conflict the same way.
+
+    Parameters
+    ----------
+    payload : dict
+        Raw ``data_description`` payload.
+    asset_name : str
+        Name of the asset it was fetched for.
+
+    Returns
+    -------
+    dict
+        The payload, with ``name`` corrected if it differed.
+    """
+    if payload.get("name") == asset_name:
+        return payload
+    logger.info(
+        "Parent document names itself %r but was fetched as %r; using the latter",
+        payload.get("name"),
+        asset_name,
+    )
+    return {**payload, "name": asset_name}
+
+
 def resolve_parent_metadata(
     asset_name: str,
     sources: Iterable[tuple[MetadataSource, Fetcher]],
@@ -170,6 +204,7 @@ def resolve_parent_metadata(
         original_version = document.get("schema_version")
         upgraded = not _is_current_schema(document)
         payload = upgrader(document) if upgraded else document
+        payload = _with_asset_name(payload, asset_name)
         return ParentMetadata(
             data_description=DataDescription.model_validate(payload),
             asset_name=asset_name,
