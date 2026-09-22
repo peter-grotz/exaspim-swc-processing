@@ -23,7 +23,6 @@ STAGE_FILES = {
     "refinement/final-voxel": ".swc",
     "refinement/final-voxel-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
-    "final/ccf_space_reconstructions/jsons": ".json",
 }
 
 
@@ -91,21 +90,21 @@ def test_discover_cells_warns_when_a_source_directory_is_absent(
     stage_root: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A role with no source directory is reported and the remaining roles still index."""
-    for path in (stage_root / "final/ccf_space_reconstructions/jsons").iterdir():
+    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
         path.unlink()
-    (stage_root / "final/ccf_space_reconstructions/jsons").rmdir()
+    (stage_root / "refinement/final-voxel-resampled").rmdir()
     with caplog.at_level(logging.WARNING):
         cells = discover_cells(stage_root)
-    assert "ccf_annotation" in caplog.text
+    assert "specimen_resampled" in caplog.text
     for cell in cells.values():
-        assert "ccf_annotation" not in cell.artifacts
+        assert "specimen_resampled" not in cell.artifacts
 
 
 def test_missing_roles_reports_only_required_artifacts(stage_root: Path) -> None:
     """An absent optional artifact does not make a cell incomplete; a required one does."""
     for path in (stage_root / "final/ccf_space_reconstructions/swcs").iterdir():
         path.unlink()
-    for path in (stage_root / "final/ccf_space_reconstructions/jsons").iterdir():
+    for path in (stage_root / "refinement/final-voxel-resampled").iterdir():
         path.unlink()
     cells = discover_cells(stage_root)
     for cell in cells.values():
@@ -176,10 +175,10 @@ def test_place_artifact_replaces_an_existing_destination(tmp_path: Path) -> None
 def test_write_cell_directory_skips_absent_roles(tmp_path: Path, stage_root: Path) -> None:
     """Only discovered artifacts are written."""
     cell = discover_cells(stage_root)[parse_stem(STEMS[0])]
-    del cell.artifacts["ccf_annotation"]
+    del cell.artifacts["specimen_resampled"]
     written = write_cell_directory(cell, tmp_path / "cell")
-    assert "ccf_annotation" not in written
-    assert set(written) == {spec.role for spec in ARTIFACT_SPECS} - {"ccf_annotation"}
+    assert "specimen_resampled" not in written
+    assert set(written) == {spec.role for spec in ARTIFACT_SPECS} - {"specimen_resampled"}
 
 
 def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: Path) -> None:
@@ -193,7 +192,6 @@ def test_build_cell_layout_writes_the_expected_tree(stage_root: Path, tmp_path: 
     for relative in (
         f"specimen_space_reconstructions/refined/{stem}.swc",
         f"ccf_space_reconstructions/{stem}.swc",
-        f"ccf_space_reconstructions/{stem}.json",
     ):
         assert (cell_dir / relative).is_file(), relative
 

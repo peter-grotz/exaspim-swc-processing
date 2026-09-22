@@ -114,13 +114,6 @@ ARTIFACT_SPECS: tuple[ArtifactSpec, ...] = (
         ("final/ccf_space_reconstructions/swcs", "ccf_space_reconstructions/swcs"),
         "ccf_space_reconstructions",
     ),
-    _spec(
-        "ccf_annotation",
-        ("final/ccf_space_reconstructions/jsons", "ccf_space_reconstructions/jsons"),
-        "ccf_space_reconstructions",
-        suffix=".json",
-        required=False,
-    ),
 )
 """Artifacts collected into each cell directory, in the order they are placed."""
 
