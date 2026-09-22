@@ -19,6 +19,7 @@ from exaspim_swc_processing.registration import (
     registration_volume_key,
     resampled_geometry,
     zarr_level_key,
+    zarr_shape,
 )
 
 FIXTURE = Path(__file__).parent / "resources" / "ccf_alignment_processing.json"
@@ -252,3 +253,31 @@ def test_reconcile_rejects_a_changed_spacing() -> None:
     b = VolumeGeometry((10, 10, 10), (0.01, 0.01, 0.02))
     with pytest.raises(RegistrationRecordError, match="spacing"):
         reconcile(a, b, "resampled")
+
+
+def test_a_five_dimensional_zarr_shape_reduces_to_its_spatial_axes() -> None:
+    """Fused exaSPIM zarrs are written ``(t, c, z, y, x)``; 826509 level 2."""
+    assert zarr_shape({"shape": [1, 1, 663, 1213, 2005]}) == (663, 1213, 2005)
+
+
+def test_a_three_dimensional_zarr_shape_passes_through() -> None:
+    """A plain 3D zarr needs no reduction."""
+    assert zarr_shape({"shape": [646, 1267, 2061]}) == (646, 1267, 2061)
+
+
+def test_a_non_singleton_leading_axis_is_rejected() -> None:
+    """A multi-channel array would make the spatial axes ambiguous."""
+    with pytest.raises(RegistrationRecordError, match="non-singleton"):
+        zarr_shape({"shape": [1, 3, 663, 1213, 2005]})
+
+
+def test_a_shape_too_short_to_be_a_volume_is_rejected() -> None:
+    """Two axes cannot give a 3D geometry."""
+    with pytest.raises(RegistrationRecordError, match="does not describe a volume"):
+        zarr_shape({"shape": [1213, 2005]})
+
+
+def test_a_missing_zarr_shape_is_rejected() -> None:
+    """An absent key is an error, not an empty shape."""
+    with pytest.raises(RegistrationRecordError, match="does not describe a volume"):
+        zarr_shape({})

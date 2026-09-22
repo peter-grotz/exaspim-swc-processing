@@ -302,8 +302,40 @@ def zarr_level_key(pass_: RegistrationPass) -> str:
 NIFTI_HEADER_SIZE = 348
 """Bytes of a NIfTI-1 header, which carries everything needed here."""
 
-_HEADER_FETCH_BYTES = 200_000
+HEADER_FETCH_BYTES = 200_000
 """Compressed bytes to request. Ample for the header of a gzipped NIfTI."""
+
+
+def zarr_shape(zarray: dict) -> tuple[int, int, int]:
+    """Read the spatial shape from a ``.zarray``, dropping leading singleton axes.
+
+    Fused exaSPIM zarrs are written 5D as ``(t, c, z, y, x)``, so the spatial extent is
+    the trailing three entries.
+
+    Parameters
+    ----------
+    zarray : dict
+        A decoded ``.zarray`` document.
+
+    Returns
+    -------
+    tuple[int, int, int]
+        Shape as ``(z, y, x)``, ready for :func:`loaded_geometry`.
+
+    Raises
+    ------
+    RegistrationRecordError
+        If the shape is missing, too short, or has a non-singleton leading axis.
+    """
+    shape = zarray.get("shape")
+    if not isinstance(shape, list) or len(shape) < 3:
+        raise RegistrationRecordError(f"Zarr shape {shape!r} does not describe a volume")
+    leading, spatial = shape[:-3], shape[-3:]
+    if any(extent != 1 for extent in leading):
+        raise RegistrationRecordError(
+            f"Zarr shape {shape} has a non-singleton leading axis; cannot reduce to 3D"
+        )
+    return (int(spatial[0]), int(spatial[1]), int(spatial[2]))
 
 
 def parse_nifti_geometry(compressed_header: bytes) -> VolumeGeometry:
