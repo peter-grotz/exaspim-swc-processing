@@ -14,6 +14,7 @@ from exaspim_swc_processing.registration import (
     RegistrationRecordError,
     VolumeGeometry,
     dataset_name,
+    find_template_to_ccf_asset,
     loaded_geometry,
     parse_nifti_geometry,
     parse_registration_record,
@@ -327,3 +328,29 @@ def test_candidates_are_tried_in_order() -> None:
 def test_no_dataset_name_yields_none() -> None:
     """A caller must be able to tell that nothing was found."""
     assert dataset_name("/scratch/reg_bundle", "") is None
+
+
+def test_the_template_asset_is_found_in_a_real_record() -> None:
+    """All 56 registration records name this version, the pipeline pins v1.5."""
+    assert find_template_to_ccf_asset(_record()) == "reg_exaspim_template_to_ccf_25um_v1.4"
+
+
+def test_the_template_asset_is_found_without_parsing_the_pass() -> None:
+    """Older records lack the parameter blocks but still name the asset."""
+    record = {"notes": "/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz"}
+    assert find_template_to_ccf_asset(record) == "reg_exaspim_template_to_ccf_25um_v1.4"
+
+
+def test_a_record_naming_no_template_asset_yields_none() -> None:
+    """The caller falls back to its default rather than guessing."""
+    assert find_template_to_ccf_asset({"data_processes": []}) is None
+
+
+def test_a_record_naming_two_template_assets_is_rejected() -> None:
+    """Choosing between them silently would mis-register."""
+    record = {
+        "a": "reg_exaspim_template_to_ccf_25um_v1.4",
+        "b": "reg_exaspim_template_to_ccf_25um_v1.5",
+    }
+    with pytest.raises(RegistrationRecordError, match="cannot choose"):
+        find_template_to_ccf_asset(record)

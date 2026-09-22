@@ -30,6 +30,7 @@ volumes. Getting any of them wrong yields plausible coordinates rather than an e
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import re
@@ -340,6 +341,49 @@ def dataset_name(*candidates: str) -> str | None:
         if match:
             return match.group(0)
     return None
+
+
+TEMPLATE_TO_CCF_PATTERN = re.compile(r"reg_exaspim_template_to_ccf[A-Za-z0-9_.]*")
+"""Matches a template-to-CCF data asset name wherever it appears in a record."""
+
+
+def find_template_to_ccf_asset(record: dict) -> str | None:
+    """Recover the template-to-CCF asset the registration used, from anywhere in a record.
+
+    The asset is a Code Ocean mount with no S3 copy, so only its name is recoverable --
+    but the name is what selects the right mounted version, and using the wrong one
+    yields plausible CCF coordinates rather than an error.
+
+    This scans the serialised record rather than a known field because the field moved:
+    older records predate the parameter blocks :func:`parse_registration_record` reads,
+    yet still name the asset in their recorded transform paths. All 56 registration
+    records carry exactly one name, and it is ``..._25um_v1.4`` in every case.
+
+    Parameters
+    ----------
+    record : dict
+        A decoded ``ccf_alignment/processing.json``.
+
+    Returns
+    -------
+    str | None
+        The asset name, e.g. ``"reg_exaspim_template_to_ccf_25um_v1.4"``, or ``None``
+        when the record names none.
+
+    Raises
+    ------
+    RegistrationRecordError
+        If the record names more than one, which would make the choice ambiguous.
+    """
+    names = sorted(set(TEMPLATE_TO_CCF_PATTERN.findall(json.dumps(record))))
+    if not names:
+        return None
+    if len(names) > 1:
+        raise RegistrationRecordError(
+            f"Record names {len(names)} template-to-CCF assets ({', '.join(names)}); "
+            "cannot choose one"
+        )
+    return names[0]
 
 
 def zarr_level_key(pass_: RegistrationPass) -> str:
