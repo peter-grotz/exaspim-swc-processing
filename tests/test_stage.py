@@ -10,6 +10,7 @@ from aind_data_schema_models.process_names import ProcessName
 from exaspim_swc_processing.stage import (
     DATA_PROCESS_FILENAME,
     build_stage_process,
+    installed_version,
     resolve_code,
     write_stage_process,
 )
@@ -41,13 +42,31 @@ def test_a_github_url_is_preferred_when_given(monkeypatch: pytest.MonkeyPatch) -
     assert code.url == "https://github.com/peter-grotz/exaspim-swc-processing"
 
 
-def test_version_is_none_rather_than_empty_when_unknown(
+def test_version_falls_back_to_the_installed_library(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Code Ocean generates main.nf and does not export the pinned capsule commit.
+
+    The installed library version is what actually determines a thin capsule's
+    behaviour, and AIND accepts a version in place of a commit hash.
+    """
+    monkeypatch.setenv("CO_CAPSULE_ID", CAPSULE_ID)
+    monkeypatch.delenv("CODE_VERSION", raising=False)
+    assert resolve_code("x").version == installed_version("exaspim-swc-processing")
+
+
+def test_version_is_none_when_nothing_identifies_the_code(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An absent version is null, not an empty string that looks recorded."""
     monkeypatch.setenv("CO_CAPSULE_ID", CAPSULE_ID)
     monkeypatch.delenv("CODE_VERSION", raising=False)
-    assert resolve_code("x").version is None
+    assert resolve_code("x", distribution="not-installed-anywhere").version is None
+
+
+def test_installed_version_returns_none_for_an_absent_distribution() -> None:
+    """A capsule that did not install the library still produces a valid record."""
+    assert installed_version("definitely-not-installed") is None
 
 
 def test_url_is_empty_outside_code_ocean(monkeypatch: pytest.MonkeyPatch) -> None:
