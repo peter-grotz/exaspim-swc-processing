@@ -26,11 +26,16 @@ from aind_data_schema.components.identifiers import Code
 from aind_data_schema.core.processing import DataProcess, ProcessStage, ResourceUsage
 from aind_data_schema_models.process_names import ProcessName
 
+from exaspim_swc_processing.layout import place_artifact
+
 CAPSULE_URL_TEMPLATE = "https://codeocean.allenneuraldynamics.org/capsule/{capsule_id}"
 """Code Ocean capsule URL, used when no repository URL is given."""
 
 DATA_PROCESS_FILENAME = "data_process.json"
 """Name a stage writes its record under."""
+
+UPSTREAM_STAGES = ("dispatch", "refinement", "alignment", "final")
+"""Stage directories that are passed along the chain, in pipeline order."""
 
 
 def _resources() -> ResourceUsage:
@@ -224,3 +229,44 @@ def write_stage_process(process: DataProcess, output_dir: Path) -> Path:
     path = output_dir / DATA_PROCESS_FILENAME
     path.write_text(process.model_dump_json(indent=2), encoding="utf-8")
     return path
+
+
+def carry_forward(
+    data_dir: Path,
+    results_dir: Path,
+    stages: Sequence[str],
+) -> list[str]:
+    """Republish upstream stage outputs so later stages can still see them.
+
+    Nextflow hands each process only the previous one's ``/results``, so a stage that does
+    not republish what it received removes it from the chain. The terminal packaging stage
+    needs every stage's ``data_process.json`` and the refined reconstructions, so each
+    intermediate stage has to pass them along.
+
+    Files are hardlinked where the filesystem allows and copied otherwise, so passing a
+    multi-gigabyte tree through costs little beyond directory entries.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Directory the upstream outputs are mounted at.
+    results_dir : Path
+        Directory this stage writes to.
+    stages : Sequence[str]
+        Stage directory names to republish, if present.
+
+    Returns
+    -------
+    list[str]
+        The stages that were found and republished, in the order given.
+    """
+    carried: list[str] = []
+    for stage in stages:
+        source = data_dir / stage
+        if not source.is_dir():
+            continue
+        for path in sorted(source.rglob("*")):
+            if path.is_file():
+                place_artifact(path, results_dir / stage / path.relative_to(source))
+        carried.append(stage)
+    return carried
