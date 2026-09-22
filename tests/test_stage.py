@@ -9,7 +9,9 @@ from aind_data_schema_models.process_names import ProcessName
 
 from exaspim_swc_processing.stage import (
     DATA_PROCESS_FILENAME,
+    UPSTREAM_STAGES,
     build_stage_process,
+    carry_forward,
     installed_version,
     resolve_code,
     write_stage_process,
@@ -151,3 +153,35 @@ def test_write_round_trips_through_the_schema(tmp_path: Path) -> None:
     assert path.name == DATA_PROCESS_FILENAME
     reloaded = DataProcess.model_validate_json(path.read_text(encoding="utf-8"))
     assert reloaded.name == "s"
+
+
+def test_carry_forward_republishes_upstream_stages(tmp_path: Path) -> None:
+    """Nextflow hands on only the previous stage's results, so each stage must republish."""
+    data = tmp_path / "data"
+    (data / "dispatch").mkdir(parents=True)
+    (data / "dispatch" / "data_process.json").write_text("{}", encoding="utf-8")
+    (data / "refinement" / "final-voxel").mkdir(parents=True)
+    (data / "refinement" / "final-voxel" / "N001-794492-HP.swc").write_text("x", encoding="utf-8")
+
+    results = tmp_path / "results"
+    carried = carry_forward(data, results, UPSTREAM_STAGES)
+
+    assert carried == ["dispatch", "refinement"]
+    assert (results / "dispatch" / "data_process.json").is_file()
+    assert (results / "refinement" / "final-voxel" / "N001-794492-HP.swc").is_file()
+
+
+def test_carry_forward_skips_absent_stages(tmp_path: Path) -> None:
+    """The first stage has no upstream outputs; that is not an error."""
+    assert carry_forward(tmp_path / "data", tmp_path / "results", UPSTREAM_STAGES) == []
+
+
+def test_carry_forward_preserves_nested_structure(tmp_path: Path) -> None:
+    """Deeply nested outputs survive the hop."""
+    data = tmp_path / "data"
+    nested = data / "final" / "ccf_space_reconstructions" / "jsons"
+    nested.mkdir(parents=True)
+    (nested / "N001-794492-HP.json").write_text("{}", encoding="utf-8")
+    results = tmp_path / "results"
+    carry_forward(data, results, ("final",))
+    assert (results / "final/ccf_space_reconstructions/jsons/N001-794492-HP.json").is_file()
