@@ -118,3 +118,13 @@ def test_error_names_both_the_cell_and_the_parent() -> None:
         derive_cell_data_description(parent, RECONSTRUCTION, CREATION_TIME)
     assert "N001-794492-HP" in str(info.value)
     assert "not-an-aind-asset-name" in str(info.value)
+
+
+def test_a_raw_form_parent_name_raises_a_clear_error() -> None:
+    """A name with only one timestamp cannot yield the original input.
+
+    parse_name returns no ``input`` key, surfacing as KeyError rather than ValueError.
+    """
+    parent = _parent(name="exaSPIM_794492_2026-01-09_16-50-40")
+    with pytest.raises(DataDescriptionDerivationError, match="Could not derive"):
+        derive_cell_data_description(parent, RECONSTRUCTION, CREATION_TIME)

@@ -86,7 +86,8 @@ def derive_cell_data_description(
     DataDescriptionDerivationError
         If the parent name does not match the AIND derived-name pattern, so the original
         raw input cannot be recovered from it, or if a required field has no value in the
-        parent and none was supplied in ``overrides``.
+        parent and none was supplied in ``overrides``. A name in raw rather than derived
+        form surfaces as a ``KeyError`` from ``parse_name``, which is wrapped here too.
 
     Examples
     --------
@@ -100,7 +101,7 @@ def derive_cell_data_description(
             creation_time=creation_time,
             **overrides,
         )
-    except ValueError as error:
+    except (ValueError, KeyError) as error:
         raise DataDescriptionDerivationError(
             f"Could not derive a data description for {reconstruction.stem!r} from parent "
             f"{parent.name!r}: {error}"
