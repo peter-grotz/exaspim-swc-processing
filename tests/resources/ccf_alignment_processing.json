@@ -1,0 +1,265 @@
+{
+   "object_type": "Processing",
+   "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/processing.py",
+   "schema_version": "2.2.8",
+   "data_processes": [
+      {
+         "object_type": "Data process",
+         "process_type": "Image atlas alignment",
+         "name": "Image atlas alignment - 25 um",
+         "stage": "Processing",
+         "code": {
+            "object_type": "Code",
+            "url": "https://codeocean.allenneuraldynamics.org/capsule/6898460/tree",
+            "name": "aind-exaspim-ccf-registration",
+            "version": "0.0.1",
+            "commit_hash": null,
+            "container": null,
+            "run_script": "/code/run",
+            "language": "Python",
+            "language_version": null,
+            "input_data": null,
+            "parameters": {
+               "input_uri": "s3://aind-open-data/exaSPIM_826509_2026-05-12_18-03-50_processed_2026-05-22_14-04-22/fusion/fused_ccf_ch.zarr/",
+               "level": 3,
+               "resolution_um": 25,
+               "dataset_id": "826509",
+               "use_fused_mask": true,
+               "mask_applied": true,
+               "sample_to_template_registration": {
+                  "sample_scale": [
+                     0.027,
+                     0.02025,
+                     0.02025
+                  ],
+                  "exaspim_template_path": "../data/exaSPIM_template_25um/exaspim_template_7sujects_nomask_25um_round6.nii.gz",
+                  "ccf_path": "../data/allen_mouse_ccf/average_template/average_template_25.nii.gz",
+                  "affine_reg_iterations": [
+                     200,
+                     100,
+                     25,
+                     3
+                  ],
+                  "syn_reg_iterations": [
+                     200,
+                     100,
+                     25,
+                     3
+                  ],
+                  "log_level": "ERROR"
+               },
+               "template_to_ccf_transforms": [
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz",
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/0GenericAffine.mat"
+               ]
+            },
+            "core_dependency": null
+         },
+         "experimenters": [
+            "Peter Grotz"
+         ],
+         "pipeline_name": "exaspim-data-processing",
+         "start_date_time": "2026-08-04T19:10:37.639249Z",
+         "end_date_time": "2026-08-04T19:23:26.784422Z",
+         "output_path": "ccf_alignment",
+         "output_parameters": null,
+         "notes": "Import + template-based registration (25 um): sample -> template -> CCF",
+         "resources": null
+      },
+      {
+         "object_type": "Data process",
+         "process_type": "Image atlas alignment",
+         "name": "Image atlas alignment - 10 um",
+         "stage": "Processing",
+         "code": {
+            "object_type": "Code",
+            "url": "https://codeocean.allenneuraldynamics.org/capsule/6898460/tree",
+            "name": "aind-exaspim-ccf-registration",
+            "version": "0.0.1",
+            "commit_hash": null,
+            "container": null,
+            "run_script": "/code/run",
+            "language": "Python",
+            "language_version": null,
+            "input_data": null,
+            "parameters": {
+               "input_uri": "s3://aind-open-data/exaSPIM_826509_2026-05-12_18-03-50_processed_2026-05-22_14-04-22/fusion/fused_ccf_ch.zarr/",
+               "level": 2,
+               "resolution_um": 10,
+               "dataset_id": "826509_10um",
+               "sample_to_template_registration": {
+                  "sample_scale": [
+                     0.0135,
+                     0.010125,
+                     0.010125
+                  ],
+                  "exaspim_template_path": "../data/exaspim_template_7subjects_nomask_10um_round6_template_only/fixed_median.nii.gz",
+                  "ccf_path": "../data/allen_mouse_ccf/average_template/average_template_10.nii.gz",
+                  "affine_reg_iterations": [
+                     300,
+                     200,
+                     50,
+                     0
+                  ],
+                  "syn_reg_iterations": [
+                     400,
+                     200,
+                     40,
+                     0
+                  ],
+                  "log_level": "ERROR"
+               },
+               "sample_to_template_transforms": [
+                  "/tmp/nxf.leSOsXxjX4/capsule/results/ccf_alignment/826509_to_exaSPIM_SyN_1Warp.nii.gz",
+                  "/tmp/nxf.leSOsXxjX4/capsule/results/ccf_alignment/826509_to_exaSPIM_SyN_0GenericAffine.mat"
+               ],
+               "template_to_ccf_transforms": [
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz",
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/0GenericAffine.mat"
+               ]
+            },
+            "core_dependency": null
+         },
+         "experimenters": [
+            "Peter Grotz"
+         ],
+         "pipeline_name": "exaspim-data-processing",
+         "start_date_time": "2026-08-04T19:23:46.693066Z",
+         "end_date_time": "2026-08-04T19:51:21.310082Z",
+         "output_path": "ccf_alignment",
+         "output_parameters": null,
+         "notes": "Import + 10um sample->CCF registration using transforms: ['/tmp/nxf.leSOsXxjX4/capsule/results/ccf_alignment/826509_to_exaSPIM_SyN_1Warp.nii.gz', '/tmp/nxf.leSOsXxjX4/capsule/results/ccf_alignment/826509_to_exaSPIM_SyN_0GenericAffine.mat'] and ['/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz', '/data/reg_exaspim_template_to_ccf_25um_v1.4/0GenericAffine.mat']",
+         "resources": null
+      },
+      {
+         "object_type": "Data process",
+         "process_type": "Image atlas alignment",
+         "name": "CCF annotation to sample space",
+         "stage": "Processing",
+         "code": {
+            "object_type": "Code",
+            "url": "https://codeocean.allenneuraldynamics.org/capsule/6898460/tree",
+            "name": "aind-exaspim-ccf-registration",
+            "version": "0.0.1",
+            "commit_hash": null,
+            "container": null,
+            "run_script": "/code/run_register_ccf_annotation_10um.sh",
+            "language": "Python",
+            "language_version": null,
+            "input_data": null,
+            "parameters": {
+               "subject_id": "826509",
+               "ccf_annotation_path": "../data/allen_mouse_ccf/annotation/ccf_2017/annotation_10.nii.gz",
+               "ccf_template_path": "../data/allen_mouse_ccf/average_template/average_template_10.nii.gz",
+               "exaspim_template_path": "../data/exaspim_template_7subjects_nomask_10um_round6_template_only/fixed_median.nii.gz",
+               "level": 2
+            },
+            "core_dependency": null
+         },
+         "experimenters": [
+            "Peter Grotz"
+         ],
+         "pipeline_name": "exaspim-data-processing",
+         "start_date_time": "2026-08-04T20:23:03.151214Z",
+         "end_date_time": "2026-08-04T20:36:13.842546Z",
+         "output_path": "ccf_alignment/ccf_anno_to_sample",
+         "output_parameters": {
+            "standard_outputs": {
+               "annotation_image": "ccf_alignment/ccf_anno_to_sample/ccf_anno_in_sample_space.nii.gz",
+               "annotation_zarr": "ccf_alignment/ccf_anno_to_sample/ccf_anno_in_sample_space.zarr"
+            }
+         },
+         "notes": "Transforms CCF annotation into sample space and writes zarr/precomputed label volumes.",
+         "resources": null
+      },
+      {
+         "object_type": "Data process",
+         "process_type": "Image atlas alignment",
+         "name": "CCF meshes to sample space",
+         "stage": "Processing",
+         "code": {
+            "object_type": "Code",
+            "url": "https://codeocean.allenneuraldynamics.org/capsule/6898460/tree",
+            "name": "aind-exaspim-ccf-registration",
+            "version": "0.0.1",
+            "commit_hash": null,
+            "container": null,
+            "run_script": "/code/run_invert_ccf_objs.sh",
+            "language": "Python",
+            "language_version": null,
+            "input_data": null,
+            "parameters": {
+               "n_meshes": 840,
+               "mesh_units_um": 1.0,
+               "ccf_to_template_fwd": [
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/1Warp.nii.gz",
+                  "/data/reg_exaspim_template_to_ccf_25um_v1.4/0GenericAffine.mat"
+               ],
+               "template_to_sample_fwd": [
+                  "/results/ccf_alignment/826509_to_exaSPIM_SyN_1Warp.nii.gz",
+                  "/results/ccf_alignment/826509_to_exaSPIM_SyN_0GenericAffine.mat"
+               ],
+               "direction": "reg-FWD(C->T) then SyN-FWD(T->S), two-stage points",
+               "inv_swaps": [
+                  [
+                     1,
+                     0
+                  ],
+                  [
+                     2,
+                     1
+                  ],
+                  [
+                     0,
+                     2
+                  ]
+               ],
+               "inv_flips": [
+                  0,
+                  1
+               ]
+            },
+            "core_dependency": null
+         },
+         "experimenters": [
+            "Peter Grotz"
+         ],
+         "pipeline_name": "exaspim-data-processing",
+         "start_date_time": "2026-08-04T21:26:48.231401Z",
+         "end_date_time": "2026-08-04T21:28:47.269108Z",
+         "output_path": "ccf_alignment/ccf_mesh_to_sample",
+         "output_parameters": null,
+         "notes": "Reverse-transforms CCF region surface meshes into sample space (point transform of vertices through the CCF->template->sample chain).",
+         "resources": null
+      }
+   ],
+   "pipelines": [
+      {
+         "object_type": "Code",
+         "url": "https://codeocean.allenneuraldynamics.org/capsule/9578158/tree",
+         "name": "exaspim-data-processing",
+         "version": "0.0.0",
+         "commit_hash": null,
+         "container": null,
+         "run_script": null,
+         "language": null,
+         "language_version": null,
+         "input_data": null,
+         "parameters": null,
+         "core_dependency": null
+      }
+   ],
+   "notes": "Processes were reordered by start_date_time",
+   "dependency_graph": {
+      "CCF annotation to sample space": [
+         "Image atlas alignment - 25 um"
+      ],
+      "CCF meshes to sample space": [
+         "Image atlas alignment - 25 um"
+      ],
+      "Image atlas alignment - 10 um": [
+         "Image atlas alignment - 25 um"
+      ],
+      "Image atlas alignment - 25 um": []
+   }
+}

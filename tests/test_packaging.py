@@ -25,7 +25,6 @@ STAGE_FILES = {
     "refinement/final-voxel": ".swc",
     "refinement/final-voxel-resampled": ".swc",
     "final/ccf_space_reconstructions/swcs": ".swc",
-    "final/ccf_space_reconstructions/jsons": ".json",
 }
 CREATION_TIME = datetime(2026, 8, 19, 22, 10, 2, tzinfo=timezone.utc)
 PIPELINE = Code(
