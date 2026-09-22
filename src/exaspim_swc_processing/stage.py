@@ -19,6 +19,7 @@ import platform
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
+from importlib import metadata
 from pathlib import Path
 
 from aind_data_schema.components.identifiers import Code
@@ -54,11 +55,37 @@ def _resources() -> ResourceUsage:
     )
 
 
+def installed_version(distribution: str) -> str | None:
+    """Return the installed version of a distribution, if it is installed.
+
+    Used as the fallback for ``Code.version``. Code Ocean generates ``main.nf`` and
+    exports only ``CO_CAPSULE_ID``, ``CO_CPUS`` and ``CO_MEMORY``, so the pinned capsule
+    commit is not available to the running code. The version of the library the capsule
+    installed is available, is what actually determines behaviour for these thin
+    capsules, and is a value AIND accepts in place of a commit hash.
+
+    Parameters
+    ----------
+    distribution : str
+        Distribution name, e.g. ``"exaspim-swc-processing"``.
+
+    Returns
+    -------
+    str | None
+        The installed version, or ``None`` if the distribution is not installed.
+    """
+    try:
+        return metadata.version(distribution)
+    except metadata.PackageNotFoundError:
+        return None
+
+
 def resolve_code(
     name: str,
     url: str | None = None,
     version: str | None = None,
     run_script: str = "code/run",
+    distribution: str = "exaspim-swc-processing",
 ) -> Code:
     """Describe the code a stage ran, from the environment.
 
@@ -70,9 +97,12 @@ def resolve_code(
         Repository URL. AIND prefers a GitHub URL; when omitted the Code Ocean capsule
         URL is built from ``CO_CAPSULE_ID``.
     version : str | None, optional
-        Version or commit of the code that ran. Read from ``CODE_VERSION`` when omitted.
+        Version of the code that ran. When omitted, ``CODE_VERSION`` is read, then the
+        installed version of ``distribution``. See :func:`installed_version`.
     run_script : str, optional
         Entry point, relative to the repository root, by default ``"code/run"``.
+    distribution : str, optional
+        Installed package to fall back to for the version, by default this library.
 
     Returns
     -------
@@ -85,7 +115,7 @@ def resolve_code(
     return Code(
         url=resolved_url,
         name=name,
-        version=version or os.environ.get("CODE_VERSION") or None,
+        version=version or os.environ.get("CODE_VERSION") or installed_version(distribution),
         run_script=Path(run_script),
         language="Python",
         language_version=(
