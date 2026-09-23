@@ -1,6 +1,7 @@
 """Tests for :mod:`exaspim_swc_processing.packaging`."""
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -124,6 +125,33 @@ def _packaging_process(parent: ParentMetadata, cells: int = 2) -> DataProcess:
     )
 
 
+def _describe(parent: ParentMetadata) -> Callable[[int, datetime], DataProcess]:
+    """Return the factory :func:`package_cells` calls once the count is known.
+
+    Parameters
+    ----------
+    parent : ParentMetadata
+        Resolved parent, supplying provenance.
+
+    Returns
+    -------
+    Callable[[int, datetime], DataProcess]
+        Builds the step record from the cell count and finish time.
+    """
+
+    def build(cells: int, finished: datetime) -> DataProcess:
+        return build_packaging_process(
+            parent,
+            PACKAGER,
+            start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
+            end_time=finished,
+            output_path="cells",
+            cell_count=cells,
+        )
+
+    return build
+
+
 def _package(stage_root: Path, tmp_path: Path, **kwargs: object) -> object:
     """Package the fixture tree with default arguments.
 
@@ -149,7 +177,7 @@ def _package(stage_root: Path, tmp_path: Path, **kwargs: object) -> object:
         _stage_processes(),
         PIPELINE,
         CREATION_TIME,
-        _packaging_process(parent),
+        _describe(parent),
         **kwargs,
     )
 
@@ -296,3 +324,32 @@ def test_experimenters_can_be_overridden() -> None:
         experimenters=["Cameron Arshadi"],
     )
     assert step.experimenters == ["Cameron Arshadi"]
+
+
+def test_the_recorded_cell_count_is_the_number_actually_written(
+    stage_root: Path, tmp_path: Path
+) -> None:
+    """The count was previously fixed at call time, so every cell recorded zero."""
+    result = _package(stage_root, tmp_path)
+    record = json.loads(
+        (result.packaged[0].directory / "processing.json").read_text(encoding="utf-8")
+    )
+    packaging = [
+        p for p in record["data_processes"] if p["output_parameters"].get("cells_packaged")
+    ]
+    assert packaging[0]["output_parameters"]["cells_packaged"] == len(result.packaged)
+
+
+def test_packaging_ends_after_the_cells_are_resolved(stage_root: Path, tmp_path: Path) -> None:
+    """The end time was previously stamped before any packaging work had run."""
+    before = datetime.now(timezone.utc)
+    result = _package(stage_root, tmp_path)
+    record = json.loads(
+        (result.packaged[0].directory / "processing.json").read_text(encoding="utf-8")
+    )
+    ends = [
+        datetime.fromisoformat(p["end_date_time"])
+        for p in record["data_processes"]
+        if p["output_parameters"].get("cells_packaged")
+    ]
+    assert ends[0] >= before

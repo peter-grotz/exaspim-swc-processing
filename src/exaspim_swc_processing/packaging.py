@@ -20,9 +20,9 @@ directory — and it carries the provenance of where the parent metadata was rea
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from aind_data_schema.components.identifiers import Code
@@ -161,7 +161,7 @@ def package_cells(
     stage_processes: Sequence[DataProcess],
     pipeline: Code,
     creation_time: datetime,
-    packaging_process: DataProcess,
+    describe_packaging: Callable[[int, datetime], DataProcess],
     specs: Sequence[ArtifactSpec] = ARTIFACT_SPECS,
     overrides: Mapping[str, object] | None = None,
 ) -> PackagingResult:
@@ -181,8 +181,10 @@ def package_cells(
         The pipeline that produced the run.
     creation_time : datetime
         Creation time shared by every cell in the run.
-    packaging_process : DataProcess
-        Record of this packaging step, appended to each cell's processing record.
+    describe_packaging : Callable[[int, datetime], DataProcess]
+        Builds this packaging step's record, given the number of cells written and the
+        time the work finished. A callable rather than a record because both values are
+        only known once discovery has run, yet the record is embedded in every cell.
     specs : Sequence[ArtifactSpec], optional
         Artifacts to collect, by default :data:`~exaspim_swc_processing.layout.ARTIFACT_SPECS`.
     overrides : Mapping[str, object] | None, optional
@@ -195,10 +197,11 @@ def package_cells(
         skipped rather than written without metadata.
     """
     specs = tuple(specs)
-    processes = [*stage_processes, packaging_process]
-    packaged: list[PackagedCell] = []
     skipped: list[SkippedCell] = []
 
+    # Resolve every cell before writing any: the packaging record embedded in each cell
+    # states how many the run produced, which is not known until the last is resolved.
+    planned = []
     for reconstruction, cell in discover_cells(stage_root, specs).items():
         missing = cell.missing_roles(specs)
         if missing:
@@ -219,10 +222,16 @@ def package_cells(
             logger.warning("Skipping %s: %s", reconstruction.stem, error)
             skipped.append(SkippedCell(reconstruction, str(error)))
             continue
+        planned.append((reconstruction, cell, description))
 
+    finished = datetime.now(timezone.utc)
+    processes = [*stage_processes, describe_packaging(len(planned), finished)]
+    record = build_cell_processing(processes, pipeline)
+
+    packaged: list[PackagedCell] = []
+    for reconstruction, cell, description in planned:
         cell_dir = output_root / description.name
         _write_cell_directory(cell, cell_dir, specs)
-        record = build_cell_processing(processes, pipeline)
         (cell_dir / DATA_DESCRIPTION_FILENAME).write_text(
             description.model_dump_json(indent=2), encoding="utf-8"
         )
