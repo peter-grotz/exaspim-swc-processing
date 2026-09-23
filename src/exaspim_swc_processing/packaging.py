@@ -109,7 +109,6 @@ def build_packaging_process(
     start_time: datetime,
     end_time: datetime,
     output_path: str,
-    cell_count: int,
     experimenters: Sequence[str] = DEFAULT_EXPERIMENTERS,
 ) -> DataProcess:
     """Describe the packaging step itself.
@@ -126,8 +125,6 @@ def build_packaging_process(
         When packaging finished.
     output_path : str
         Where the cell directories were written, relative to ``/results``.
-    cell_count : int
-        Number of cells packaged in the run.
     experimenters : Sequence[str], optional
         Who is responsible for the run, by default :data:`DEFAULT_EXPERIMENTERS`.
 
@@ -149,7 +146,7 @@ def build_packaging_process(
         start_date_time=start_time,
         end_date_time=end_time,
         output_path=output_path,
-        output_parameters={**parent.provenance(), "cells_packaged": cell_count},
+        output_parameters=parent.provenance(),
         notes="Regrouped pipeline outputs into one derived asset per reconstruction.",
     )
 
@@ -161,7 +158,7 @@ def package_cells(
     stage_processes: Sequence[DataProcess],
     pipeline: Code,
     creation_time: datetime,
-    describe_packaging: Callable[[int, datetime], DataProcess],
+    describe_packaging: Callable[[datetime], DataProcess],
     specs: Sequence[ArtifactSpec] = ARTIFACT_SPECS,
     overrides: Mapping[str, object] | None = None,
 ) -> PackagingResult:
@@ -181,10 +178,11 @@ def package_cells(
         The pipeline that produced the run.
     creation_time : datetime
         Creation time shared by every cell in the run.
-    describe_packaging : Callable[[int, datetime], DataProcess]
-        Builds this packaging step's record, given the number of cells written and the
-        time the work finished. A callable rather than a record because both values are
-        only known once discovery has run, yet the record is embedded in every cell.
+    describe_packaging : Callable[[datetime], DataProcess]
+        Builds this packaging step's record, given the time the work finished. A
+        callable rather than a record because the record is embedded in every cell and
+        so must be built before any cell is written, yet must not claim to have finished
+        before the work ran.
     specs : Sequence[ArtifactSpec], optional
         Artifacts to collect, by default :data:`~exaspim_swc_processing.layout.ARTIFACT_SPECS`.
     overrides : Mapping[str, object] | None, optional
@@ -199,8 +197,8 @@ def package_cells(
     specs = tuple(specs)
     skipped: list[SkippedCell] = []
 
-    # Resolve every cell before writing any: the packaging record embedded in each cell
-    # states how many the run produced, which is not known until the last is resolved.
+    # Resolve every cell before writing any, so the shared packaging record can carry a
+    # finish time that follows the work rather than preceding it.
     planned = []
     for reconstruction, cell in discover_cells(stage_root, specs).items():
         missing = cell.missing_roles(specs)
@@ -225,7 +223,7 @@ def package_cells(
         planned.append((reconstruction, cell, description))
 
     finished = datetime.now(timezone.utc)
-    processes = [*stage_processes, describe_packaging(len(planned), finished)]
+    processes = [*stage_processes, describe_packaging(finished)]
     record = build_cell_processing(processes, pipeline)
 
     packaged: list[PackagedCell] = []

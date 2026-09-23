@@ -100,15 +100,13 @@ def _stage_processes() -> list[DataProcess]:
     return [DataProcess.model_validate(record) for record in payload]
 
 
-def _packaging_process(parent: ParentMetadata, cells: int = 2) -> DataProcess:
+def _packaging_process(parent: ParentMetadata) -> DataProcess:
     """Build the packaging step record.
 
     Parameters
     ----------
     parent : ParentMetadata
         Resolved parent, supplying provenance.
-    cells : int, optional
-        Number of cells packaged, by default 2.
 
     Returns
     -------
@@ -121,11 +119,10 @@ def _packaging_process(parent: ParentMetadata, cells: int = 2) -> DataProcess:
         start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
         end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
         output_path="cells",
-        cell_count=cells,
     )
 
 
-def _describe(parent: ParentMetadata) -> Callable[[int, datetime], DataProcess]:
+def _describe(parent: ParentMetadata) -> Callable[[datetime], DataProcess]:
     """Return the factory :func:`package_cells` calls once the count is known.
 
     Parameters
@@ -135,18 +132,17 @@ def _describe(parent: ParentMetadata) -> Callable[[int, datetime], DataProcess]:
 
     Returns
     -------
-    Callable[[int, datetime], DataProcess]
-        Builds the step record from the cell count and finish time.
+    Callable[[datetime], DataProcess]
+        Builds the step record from the finish time.
     """
 
-    def build(cells: int, finished: datetime) -> DataProcess:
+    def build(finished: datetime) -> DataProcess:
         return build_packaging_process(
             parent,
             PACKAGER,
             start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
             end_time=finished,
             output_path="cells",
-            cell_count=cells,
         )
 
     return build
@@ -245,7 +241,6 @@ def test_metadata_source_is_recorded_in_the_packaging_step(
     parameters = step.output_parameters.model_dump()
     assert parameters["metadata_source"] == "s3"
     assert parameters["upgraded_to"] == "2.4.1"
-    assert parameters["cells_packaged"] == 2
 
 
 def test_fallback_source_is_tagged_for_later_rederivation(stage_root: Path, tmp_path: Path) -> None:
@@ -320,24 +315,9 @@ def test_experimenters_can_be_overridden() -> None:
         start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
         end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
         output_path="cells",
-        cell_count=2,
         experimenters=["Cameron Arshadi"],
     )
     assert step.experimenters == ["Cameron Arshadi"]
-
-
-def test_the_recorded_cell_count_is_the_number_actually_written(
-    stage_root: Path, tmp_path: Path
-) -> None:
-    """The count was previously fixed at call time, so every cell recorded zero."""
-    result = _package(stage_root, tmp_path)
-    record = json.loads(
-        (result.packaged[0].directory / "processing.json").read_text(encoding="utf-8")
-    )
-    packaging = [
-        p for p in record["data_processes"] if p["output_parameters"].get("cells_packaged")
-    ]
-    assert packaging[0]["output_parameters"]["cells_packaged"] == len(result.packaged)
 
 
 def test_packaging_ends_after_the_cells_are_resolved(stage_root: Path, tmp_path: Path) -> None:
@@ -350,6 +330,16 @@ def test_packaging_ends_after_the_cells_are_resolved(stage_root: Path, tmp_path:
     ends = [
         datetime.fromisoformat(p["end_date_time"])
         for p in record["data_processes"]
-        if p["output_parameters"].get("cells_packaged")
+        if p["name"] == PACKAGING_STEP_NAME
     ]
     assert ends[0] >= before
+
+
+def test_no_run_level_count_is_recorded(stage_root: Path, tmp_path: Path) -> None:
+    """Every asset is a single cell, so a count of the run's cells means nothing there."""
+    result = _package(stage_root, tmp_path)
+    record = json.loads(
+        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
+    )
+    for process in record["data_processes"]:
+        assert "cells_packaged" not in (process.get("output_parameters") or {})
