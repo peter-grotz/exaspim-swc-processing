@@ -96,7 +96,10 @@ def _docdb_client(version: str, host: str) -> DocDbClient:
 
 
 def docdb_fetcher(
-    version: str, host: str = DOCDB_HOST, client: DocDbClient | None = None
+    version: str,
+    host: str = DOCDB_HOST,
+    client: DocDbClient | None = None,
+    field: str = CORE_FIELD,
 ) -> Fetcher:
     """Build a fetcher reading one DocDB endpoint.
 
@@ -112,12 +115,15 @@ def docdb_fetcher(
         Host serving the index, by default :data:`DOCDB_HOST`.
     client : DocDbClient | None, optional
         A pre-built client. Constructed on first use when omitted.
+    field : str, optional
+        Core field to read, by default :data:`CORE_FIELD`. Any top-level field of the
+        record works, e.g. ``"acquisition"``.
 
     Returns
     -------
     Fetcher
-        Returns the asset's raw ``data_description``, or ``None`` if the endpoint has no
-        record for it.
+        Returns the asset's raw document for ``field``, or ``None`` if the endpoint has
+        no record for it.
     """
 
     def _fetch(asset_name: str) -> dict | None:
@@ -136,16 +142,14 @@ def docdb_fetcher(
         resolved = client if client is not None else _docdb_client(version, host)
         records = resolved.retrieve_docdb_records(
             filter_query={"name": asset_name},
-            projection={CORE_FIELD: 1},
+            projection={field: 1},
             limit=1,
         )
         if not records:
             return None
-        document = records[0].get(CORE_FIELD)
+        document = records[0].get(field)
         if not document:
-            logger.warning(
-                "DocDB %s has a record for %r with no %s", version, asset_name, CORE_FIELD
-            )
+            logger.warning("DocDB %s has a record for %r with no %s", version, asset_name, field)
             return None
         return document
 
@@ -173,6 +177,7 @@ def _s3_client() -> S3Client:
 def s3_fetcher(
     bucket: str = OPEN_DATA_BUCKET,
     client: S3Client | None = None,
+    filename: str = DATA_DESCRIPTION_KEY,
 ) -> Fetcher:
     """Build a fetcher reading the asset's ``data_description.json`` from S3.
 
@@ -185,12 +190,14 @@ def s3_fetcher(
         Bucket holding the asset, by default :data:`OPEN_DATA_BUCKET`.
     client : S3Client | None, optional
         A pre-built S3 client. Constructed on first use when omitted.
+    filename : str, optional
+        Object to read from the asset root, by default :data:`DATA_DESCRIPTION_KEY`.
 
     Returns
     -------
     Fetcher
-        Returns the raw ``data_description``, or ``None`` if the object is absent or is
-        not readable as JSON.
+        Returns the raw document, or ``None`` if the object is absent or is not readable
+        as JSON.
     """
 
     def _fetch(asset_name: str) -> dict | None:
@@ -207,12 +214,12 @@ def s3_fetcher(
             The raw document, or ``None`` if absent or unreadable.
         """
         resolved = client if client is not None else _s3_client()
-        key = f"{asset_name}/{DATA_DESCRIPTION_KEY}"
+        key = f"{asset_name}/{filename}"
         try:
             response = resolved.get_object(Bucket=bucket, Key=key)
             return json.loads(response["Body"].read())
         except Exception as error:  # noqa: BLE001 - any read failure means "not here"
-            logger.info("No %s in s3://%s/%s (%s)", DATA_DESCRIPTION_KEY, bucket, key, error)
+            logger.info("No %s in s3://%s/%s (%s)", filename, bucket, key, error)
             return None
 
     return _fetch

@@ -12,9 +12,7 @@ from aind_data_schema.core.processing import DataProcess, Processing
 
 from exaspim_swc_processing.packaging import (
     DATA_DESCRIPTION_FILENAME,
-    PACKAGING_STEP_NAME,
     PROCESSING_FILENAME,
-    build_packaging_process,
     package_cells,
 )
 from exaspim_swc_processing.parent_metadata import MetadataSource, ParentMetadata
@@ -99,31 +97,6 @@ def _stage_processes() -> list[DataProcess]:
     return [DataProcess.model_validate(record) for record in payload]
 
 
-def _packaging_process(parent: ParentMetadata, cells: int = 2) -> DataProcess:
-    """Build the packaging step record.
-
-    Parameters
-    ----------
-    parent : ParentMetadata
-        Resolved parent, supplying provenance.
-    cells : int, optional
-        Number of cells packaged, by default 2.
-
-    Returns
-    -------
-    DataProcess
-        The step record.
-    """
-    return build_packaging_process(
-        parent,
-        PACKAGER,
-        start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
-        end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
-        output_path="cells",
-        cell_count=cells,
-    )
-
-
 def _package(stage_root: Path, tmp_path: Path, **kwargs: object) -> object:
     """Package the fixture tree with default arguments.
 
@@ -149,7 +122,6 @@ def _package(stage_root: Path, tmp_path: Path, **kwargs: object) -> object:
         _stage_processes(),
         PIPELINE,
         CREATION_TIME,
-        _packaging_process(parent),
         **kwargs,
     )
 
@@ -192,32 +164,6 @@ def test_written_asset_validates_as_metadata(stage_root: Path, tmp_path: Path) -
     )
     assert record.data_description is not None
     assert record.processing is not None
-
-
-def test_packaging_step_is_recorded_in_each_cell(stage_root: Path, tmp_path: Path) -> None:
-    """The step that produced the directory appears in its own provenance."""
-    result = _package(stage_root, tmp_path)
-    processing = Processing.model_validate_json(
-        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
-    )
-    names = [process.name for process in processing.data_processes]
-    assert PACKAGING_STEP_NAME in names
-    assert processing.dependency_graph[PACKAGING_STEP_NAME] == ["aligned_swc_processing"]
-
-
-def test_metadata_source_is_recorded_in_the_packaging_step(
-    stage_root: Path, tmp_path: Path
-) -> None:
-    """Where the parent metadata came from is auditable from the published asset."""
-    result = _package(stage_root, tmp_path)
-    processing = Processing.model_validate_json(
-        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
-    )
-    step = next(p for p in processing.data_processes if p.name == PACKAGING_STEP_NAME)
-    parameters = step.output_parameters.model_dump()
-    assert parameters["metadata_source"] == "s3"
-    assert parameters["upgraded_to"] == "2.4.1"
-    assert parameters["cells_packaged"] == 2
 
 
 def test_fallback_source_is_tagged_for_later_rederivation(stage_root: Path, tmp_path: Path) -> None:
@@ -275,24 +221,22 @@ def test_overrides_apply_to_every_cell(stage_root: Path, tmp_path: Path) -> None
         assert description.project_name == "Neuron Reconstruction"
 
 
-def test_packaging_process_records_the_output_path() -> None:
-    """The step points at where it wrote."""
-    step = _packaging_process(_parent())
-    assert str(step.output_path) == "cells"
-    assert step.process_type == "Other"
-    assert step.notes
-    assert step.experimenters == ["Peter Grotz"]
-
-
-def test_experimenters_can_be_overridden() -> None:
-    """A run attributable to a person records that person."""
-    step = build_packaging_process(
-        _parent(),
-        PACKAGER,
-        start_time=datetime(2026, 8, 20, 4, tzinfo=timezone.utc),
-        end_time=datetime(2026, 8, 20, 4, 5, tzinfo=timezone.utc),
-        output_path="cells",
-        cell_count=2,
-        experimenters=["Cameron Arshadi"],
+def test_packaging_does_not_record_itself_as_a_process(stage_root: Path, tmp_path: Path) -> None:
+    """Hardlinking files into a directory produces no data, so it is not a process."""
+    result = _package(stage_root, tmp_path)
+    processing = Processing.model_validate_json(
+        (result.packaged[0].directory / PROCESSING_FILENAME).read_text(encoding="utf-8")
     )
-    assert step.experimenters == ["Cameron Arshadi"]
+    names = [process.name for process in processing.data_processes]
+    assert names == [process.name for process in _stage_processes()]
+    assert "exaspim_swc_packaging" not in names
+    assert set(processing.dependency_graph) == set(names)
+
+
+def test_the_metadata_source_stays_discoverable_on_tags(stage_root: Path, tmp_path: Path) -> None:
+    """Dropping the process loses output_parameters; tags carry the source and index."""
+    result = _package(stage_root, tmp_path)
+    description = json.loads(
+        (result.packaged[0].directory / DATA_DESCRIPTION_FILENAME).read_text(encoding="utf-8")
+    )
+    assert any(tag.startswith("metadata-source:") for tag in description["tags"])
