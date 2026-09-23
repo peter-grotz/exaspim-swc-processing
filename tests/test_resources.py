@@ -91,7 +91,7 @@ def test_an_unparseable_allocation_yields_none() -> None:
 
 
 def test_the_report_compares_peak_to_the_allocation(tmp_path: Path) -> None:
-    """This is the line the 120 GB run is for."""
+    """The 120 GB run exists to produce this line."""
     root = _cgroup(tmp_path, "sys/fs/cgroup/memory.peak", str(15 * GIB))
     report = peak_memory_report(root, {"CO_MEMORY": str(120 * GIB)})
     assert report == "peak 15360 MiB of 122880 MiB allocated (12%), from cgroup"
