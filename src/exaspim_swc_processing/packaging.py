@@ -12,22 +12,24 @@ are deliberately not inherited — including ``subject`` would pull in a four-fi
 requirement that the upstream assets cannot currently satisfy, so the asset would advertise
 itself as incomplete. Quality control belongs to a later stage and is not written here.
 
-The packaging step records itself as a :class:`~aind_data_schema.core.processing.DataProcess`
-appended to each cell's record. It is a real processing step — it is what produced the
-directory — and it carries the provenance of where the parent metadata was read from.
+Packaging does not record itself as a
+:class:`~aind_data_schema.core.processing.DataProcess`. It changes no data -- the
+reconstructions are hardlinked, byte for byte -- so a record of it would describe
+assembling the asset rather than producing the data, in a document meant for the latter.
+Where the parent metadata was read from is carried on ``DataDescription.tags``, which is
+indexed and therefore searchable, unlike ``output_parameters``.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from aind_data_schema.components.identifiers import Code
-from aind_data_schema.core.processing import DataProcess, ProcessStage
-from aind_data_schema_models.process_names import ProcessName
+from aind_data_schema.core.processing import DataProcess
 
 from exaspim_swc_processing.data_description import (
     DataDescriptionDerivationError,
@@ -40,12 +42,6 @@ from exaspim_swc_processing.parent_metadata import ParentMetadata
 from exaspim_swc_processing.processing import build_cell_processing
 
 logger = logging.getLogger(__name__)
-
-PACKAGING_STEP_NAME = "exaspim_swc_packaging"
-"""``DataProcess.name`` of the step this module performs."""
-
-DEFAULT_EXPERIMENTERS = ("Peter Grotz",)
-"""Default ``DataProcess.experimenters`` for the packaging step."""
 
 DATA_DESCRIPTION_FILENAME = "data_description.json"
 PROCESSING_FILENAME = "processing.json"
@@ -103,54 +99,6 @@ class PackagingResult:
     skipped: tuple[SkippedCell, ...]
 
 
-def build_packaging_process(
-    parent: ParentMetadata,
-    code: Code,
-    start_time: datetime,
-    end_time: datetime,
-    output_path: str,
-    experimenters: Sequence[str] = DEFAULT_EXPERIMENTERS,
-) -> DataProcess:
-    """Describe the packaging step itself.
-
-    Parameters
-    ----------
-    parent : ParentMetadata
-        Resolved parent metadata, supplying the provenance of where it was read from.
-    code : Code
-        The packaging code: repository URL, name and version.
-    start_time : datetime
-        When packaging started.
-    end_time : datetime
-        When packaging finished.
-    output_path : str
-        Where the cell directories were written, relative to ``/results``.
-    experimenters : Sequence[str], optional
-        Who is responsible for the run, by default :data:`DEFAULT_EXPERIMENTERS`.
-
-    Returns
-    -------
-    DataProcess
-        The step record, carrying :meth:`ParentMetadata.provenance` in
-        ``output_parameters``. Typed ``OTHER`` because regrouping files into per-cell
-        assets is not one of the vocabulary's defined operations; the docs direct
-        unmatched operations to ``ANALYSIS`` or ``OTHER``, and ``OTHER`` requires the
-        ``name`` and ``notes`` set here.
-    """
-    return DataProcess(
-        process_type=ProcessName.OTHER,
-        name=PACKAGING_STEP_NAME,
-        stage=ProcessStage.PROCESSING,
-        code=code,
-        experimenters=list(experimenters),
-        start_date_time=start_time,
-        end_date_time=end_time,
-        output_path=output_path,
-        output_parameters=parent.provenance(),
-        notes="Regrouped pipeline outputs into one derived asset per reconstruction.",
-    )
-
-
 def package_cells(
     stage_root: Path,
     output_root: Path,
@@ -158,7 +106,6 @@ def package_cells(
     stage_processes: Sequence[DataProcess],
     pipeline: Code,
     creation_time: datetime,
-    describe_packaging: Callable[[datetime], DataProcess],
     specs: Sequence[ArtifactSpec] = ARTIFACT_SPECS,
     overrides: Mapping[str, object] | None = None,
 ) -> PackagingResult:
@@ -178,11 +125,6 @@ def package_cells(
         The pipeline that produced the run.
     creation_time : datetime
         Creation time shared by every cell in the run.
-    describe_packaging : Callable[[datetime], DataProcess]
-        Builds this packaging step's record, given the time the work finished. A
-        callable rather than a record because the record is embedded in every cell and
-        so must be built before any cell is written, yet must not claim to have finished
-        before the work ran.
     specs : Sequence[ArtifactSpec], optional
         Artifacts to collect, by default :data:`~exaspim_swc_processing.layout.ARTIFACT_SPECS`.
     overrides : Mapping[str, object] | None, optional
@@ -195,11 +137,10 @@ def package_cells(
         skipped rather than written without metadata.
     """
     specs = tuple(specs)
+    record = build_cell_processing(list(stage_processes), pipeline)
+    packaged: list[PackagedCell] = []
     skipped: list[SkippedCell] = []
 
-    # Resolve every cell before writing any, so the shared packaging record can carry a
-    # finish time that follows the work rather than preceding it.
-    planned = []
     for reconstruction, cell in discover_cells(stage_root, specs).items():
         missing = cell.missing_roles(specs)
         if missing:
@@ -220,14 +161,7 @@ def package_cells(
             logger.warning("Skipping %s: %s", reconstruction.stem, error)
             skipped.append(SkippedCell(reconstruction, str(error)))
             continue
-        planned.append((reconstruction, cell, description))
 
-    finished = datetime.now(timezone.utc)
-    processes = [*stage_processes, describe_packaging(finished)]
-    record = build_cell_processing(processes, pipeline)
-
-    packaged: list[PackagedCell] = []
-    for reconstruction, cell, description in planned:
         cell_dir = output_root / description.name
         _write_cell_directory(cell, cell_dir, specs)
         (cell_dir / DATA_DESCRIPTION_FILENAME).write_text(
