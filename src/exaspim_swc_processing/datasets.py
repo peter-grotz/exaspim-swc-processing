@@ -47,6 +47,10 @@ class DatasetNotFoundError(LookupError):
     """Raised when a dataset specification resolves to nothing usable."""
 
 
+class DatasetMismatchError(ValueError):
+    """Raised when the dataset given disagrees with the image the reconstructions name."""
+
+
 @dataclass(frozen=True)
 class ProcessedDataset:
     """A processed dataset as the registry describes it.
@@ -70,6 +74,30 @@ class ProcessedDataset:
     subject_id: str
     created: str
     source: str
+
+
+def dataset_from_image_path(image_path: str) -> tuple[str, str] | None:
+    """Recover the bucket and dataset name from a recorded image URI.
+
+    A reconstruction asset records the image it was traced on, e.g.
+    ``s3://aind-open-data/<dataset>/fusion/fused.zarr``. The dataset is the first key
+    segment, whatever its name looks like.
+
+    Parameters
+    ----------
+    image_path : str
+        An ``s3://`` URI.
+
+    Returns
+    -------
+    tuple[str, str] | None
+        ``(bucket, dataset)``, or ``None`` if the URI names no dataset.
+    """
+    parsed = urlparse(image_path.strip())
+    key = parsed.path.lstrip("/")
+    if parsed.scheme != "s3" or not parsed.netloc or not key:
+        return None
+    return parsed.netloc, key.split("/")[0]
 
 
 def registry_sources(host: str = DOCDB_HOST) -> list[tuple[MetadataSource, DocDbClient]]:
@@ -267,19 +295,24 @@ def resolve_processed_dataset(
     registry: Sequence[tuple[MetadataSource, DocDbClient]],
     client: S3Client,
     default_bucket: str,
+    image_path: str = "",
 ) -> ProcessedDataset:
-    """Resolve a dataset through the registry first, then S3 by exact name.
+    """Resolve the processed dataset: registry first, then the traced image, then S3.
 
     Parameters
     ----------
     spec : str
-        A dataset name, ``s3://`` URI, mounted path, or subject id.
+        What the run was given: a dataset name, ``s3://`` URI, mounted path, subject id,
+        or empty.
     registry : Sequence[tuple[MetadataSource, DocDbClient]]
         Registry endpoints in priority order.
     client : S3Client
-        An S3 client, for confirming registrations and the fallback.
+        An S3 client, for confirming registrations and the fallbacks.
     default_bucket : str
-        Bucket for the fallback when the specification names none.
+        Bucket for the S3 fallback when the specification names none.
+    image_path : str, optional
+        The image the reconstructions were traced on, as recorded in their
+        ``refinement/data_process.json``.
 
     Returns
     -------
@@ -288,21 +321,50 @@ def resolve_processed_dataset(
 
     Raises
     ------
+    DatasetMismatchError
+        If ``spec`` resolves to a different dataset than the one the reconstructions were
+        traced on. Transforming them with that registration would be wrong.
     DatasetNotFoundError
-        If neither the registry nor S3 resolves it.
+        If nothing resolves.
     """
-    found = find_processed_dataset(spec, registry, registration_exists(client))
-    if found is None:
-        found = find_in_s3(spec, client, default_bucket)
-    if found is not None:
-        return found
-    if spec.strip().strip("'\"").isdigit():
-        raise DatasetNotFoundError(
-            f"Subject {spec} has no registered processed dataset in DocDB. Pass the dataset "
-            "name or its s3:// URI instead; S3 cannot be searched by subject without "
-            "assuming how datasets are named."
+    has_registration = registration_exists(client)
+    traced = dataset_from_image_path(image_path) if image_path else None
+
+    # 1. The registry, with whatever the run was given.
+    found = find_processed_dataset(spec, registry, has_registration) if spec.strip() else None
+    # 2. The image the reconstructions record, looked up by its exact name.
+    if found is None and traced is not None:
+        bucket, name = traced
+        found = find_processed_dataset(name, registry, has_registration) or find_in_s3(
+            f"s3://{bucket}/{name}", client, default_bucket
         )
-    raise DatasetNotFoundError(
-        f"{spec!r} does not resolve to a dataset with a CCF registration in DocDB or in "
-        f"s3://{default_bucket}"
-    )
+        if found is not None:
+            found = ProcessedDataset(
+                found.name,
+                found.bucket,
+                found.subject_id,
+                found.created,
+                f"{found.source} (from the reconstructions' image_path)",
+            )
+    # 3. S3, by exact name from what the run was given.
+    if found is None and spec.strip():
+        found = find_in_s3(spec, client, default_bucket)
+
+    if found is None:
+        if spec.strip().strip("'\"").isdigit():
+            raise DatasetNotFoundError(
+                f"Subject {spec} has no registered processed dataset in DocDB, and the "
+                "reconstructions' image_path does not resolve to one. Pass the dataset name "
+                "or its s3:// URI; S3 cannot be searched by subject without assuming how "
+                "datasets are named."
+            )
+        raise DatasetNotFoundError(
+            f"No processed dataset with a CCF registration resolves from {spec!r} or from "
+            f"the reconstructions' image_path {image_path!r}"
+        )
+    if traced is not None and traced[1] != found.name:
+        raise DatasetMismatchError(
+            f"The reconstructions were traced on {traced[1]}, but {spec!r} resolves to "
+            f"{found.name}. Their registration would be applied to the wrong image."
+        )
+    return found

@@ -6,9 +6,11 @@ import json
 import pytest
 
 from exaspim_swc_processing.datasets import (
+    DatasetMismatchError,
     DatasetNotFoundError,
     ProcessedDataset,
     candidate_names,
+    dataset_from_image_path,
     dataset_from_record,
     find_in_s3,
     find_processed_dataset,
@@ -289,7 +291,7 @@ def test_an_unknown_subject_is_refused_with_advice() -> None:
 
 def test_an_unresolvable_name_is_an_error() -> None:
     """Neither source has it."""
-    with pytest.raises(DatasetNotFoundError, match="does not resolve"):
+    with pytest.raises(DatasetNotFoundError, match="No processed dataset"):
         resolve_processed_dataset(ODD, [(V1, _Registry([]))], _S3({}), BUCKET)
 
 
@@ -303,3 +305,57 @@ def test_the_registry_is_consulted_v2_then_v1(monkeypatch: pytest.MonkeyPatch) -
 
     assert [source for source, _ in registry_sources()] == [V2, V1]
     assert built == ["v2", "v1"]
+
+
+UNPREFIXED = "823507_2026-06-30_16-49-27_processed_2026-08-31_10-32-14"
+IMAGE = f"s3://{BUCKET}/{UNPREFIXED}/fusion/fused.zarr"
+
+
+def test_the_dataset_is_the_first_segment_of_the_image_uri() -> None:
+    """Whatever the name looks like; 823507 has no prefix."""
+    assert dataset_from_image_path(IMAGE) == (BUCKET, UNPREFIXED)
+
+
+@pytest.mark.parametrize("uri", ["/local/fused.zarr", f"s3://{BUCKET}/", "s3:///x"])
+def test_an_image_path_naming_no_dataset_yields_nothing(uri: str) -> None:
+    """A local path or a bare bucket identifies no dataset."""
+    assert dataset_from_image_path(uri) is None
+
+
+def test_the_traced_image_resolves_when_the_registry_does_not_know_the_input() -> None:
+    """Nothing given, nothing in DocDB: the reconstructions name their own dataset."""
+    client = _registered(UNPREFIXED, subject={"subject_id": "823507"})
+    found = resolve_processed_dataset("", [(V1, _Registry([]))], client, BUCKET, IMAGE)
+    assert found.name == UNPREFIXED
+    assert found.subject_id == "823507"
+    assert "image_path" in found.source
+
+
+def test_the_traced_image_is_looked_up_in_the_registry_first() -> None:
+    """Its exact name goes to DocDB before S3."""
+    registry = _Registry([_record(NAME)])
+    image = f"s3://{BUCKET}/{NAME}/fusion/fused.zarr"
+    found = resolve_processed_dataset("", [(V1, registry)], _registered(NAME), BUCKET, image)
+    assert found.source.startswith("docdb_v1")
+
+
+def test_the_registry_is_asked_before_the_traced_image() -> None:
+    """DocDB answers for the given spec, so the image is only used to check it."""
+    registry = _Registry([_record(NAME)])
+    image = f"s3://{BUCKET}/{NAME}/fusion/fused.zarr"
+    found = resolve_processed_dataset(NAME, [(V1, registry)], _registered(NAME), BUCKET, image)
+    assert found.source == "docdb_v1"
+
+
+def test_a_dataset_other_than_the_traced_one_is_refused() -> None:
+    """A subject can have several processed datasets; only the traced one is correct."""
+    registry = _Registry([_record(NAME)])
+    client = _registered(NAME, UNPREFIXED, subject={"subject_id": "841260"})
+    with pytest.raises(DatasetMismatchError, match="traced on"):
+        resolve_processed_dataset("841260", [(V1, registry)], client, BUCKET, IMAGE)
+
+
+def test_nothing_given_and_no_image_is_an_error() -> None:
+    """With neither, there is nothing to resolve."""
+    with pytest.raises(DatasetNotFoundError, match="image_path"):
+        resolve_processed_dataset("", [(V1, _Registry([]))], _S3({}), BUCKET)
