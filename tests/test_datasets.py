@@ -291,3 +291,15 @@ def test_an_unresolvable_name_is_an_error() -> None:
     """Neither source has it."""
     with pytest.raises(DatasetNotFoundError, match="does not resolve"):
         resolve_processed_dataset(ODD, [(V1, _Registry([]))], _S3({}), BUCKET)
+
+
+def test_the_registry_is_consulted_v2_then_v1(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The migrated index first, the original second."""
+    from exaspim_swc_processing import sources
+
+    built: list[str] = []
+    monkeypatch.setattr(sources, "_docdb_client", lambda version, host: built.append(version))
+    from exaspim_swc_processing.datasets import registry_sources
+
+    assert [source for source, _ in registry_sources()] == [V2, V1]
+    assert built == ["v2", "v1"]

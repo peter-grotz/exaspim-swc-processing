@@ -26,8 +26,9 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
+from exaspim_swc_processing import sources
 from exaspim_swc_processing.parent_metadata import MetadataSource
-from exaspim_swc_processing.sources import DocDbClient, S3Client
+from exaspim_swc_processing.sources import DOCDB_HOST, DocDbClient, S3Client
 
 REGISTRATION_KEY = "ccf_alignment/processing.json"
 """Key, below a dataset, of the CCF registration's own record."""
@@ -69,6 +70,25 @@ class ProcessedDataset:
     subject_id: str
     created: str
     source: str
+
+
+def registry_sources(host: str = DOCDB_HOST) -> list[tuple[MetadataSource, DocDbClient]]:
+    """Build the registry endpoints in the order they are consulted.
+
+    Parameters
+    ----------
+    host : str, optional
+        DocDB host, by default :data:`~exaspim_swc_processing.sources.DOCDB_HOST`.
+
+    Returns
+    -------
+    list[tuple[MetadataSource, DocDbClient]]
+        DocDB v2, then v1.
+    """
+    return [
+        (MetadataSource.DOCDB_V2, sources._docdb_client("v2", host)),
+        (MetadataSource.DOCDB_V1, sources._docdb_client("v1", host)),
+    ]
 
 
 def candidate_names(spec: str) -> list[str]:
