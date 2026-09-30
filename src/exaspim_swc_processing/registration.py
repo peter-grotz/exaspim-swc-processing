@@ -113,9 +113,6 @@ class RegistrationPass:
     sample_to_template : tuple[str, ...]
         Basenames of the sample-to-template transforms, resolved against
         ``<dataset>/ccf_alignment/``. The recorded paths point at Nextflow scratch.
-    template_to_ccf : tuple[str, ...]
-        Recorded paths of the template-to-CCF transforms. These are Code Ocean data
-        assets with no S3 copy, so only the version directory is usable.
     """
 
     input_uri: str
@@ -123,7 +120,6 @@ class RegistrationPass:
     resolution_um: int
     sample_scale_mm: tuple[float, float, float]
     sample_to_template: tuple[str, ...]
-    template_to_ccf: tuple[str, ...]
 
     @property
     def loaded_spacing_mm(self) -> tuple[float, float, float]:
@@ -164,23 +160,6 @@ class RegistrationPass:
                 f"No written spacing known for a {self.resolution_um} um pass; "
                 f"known resolutions are {sorted(WRITTEN_SPACING_MM)}"
             ) from None
-
-    @property
-    def template_to_ccf_version(self) -> str | None:
-        """Name of the template-to-CCF asset the registration used.
-
-        Returns
-        -------
-        str | None
-            The directory name, e.g. ``"reg_exaspim_template_to_ccf_25um_v1.4"``, or
-            ``None`` if no transform was recorded.
-        """
-        for path in self.template_to_ccf:
-            parts = PurePosixPath(path).parts
-            for part in parts:
-                if part.startswith("reg_exaspim_template_to_ccf"):
-                    return part
-        return None
 
 
 def _as_float_triple(values: object, field: str) -> tuple[float, float, float]:
@@ -252,7 +231,6 @@ def parse_registration_record(
             sample_to_template=tuple(
                 PurePosixPath(p).name for p in parameters.get("sample_to_template_transforms") or ()
             ),
-            template_to_ccf=tuple(parameters.get("template_to_ccf_transforms") or ()),
         )
     available = sorted(
         {
