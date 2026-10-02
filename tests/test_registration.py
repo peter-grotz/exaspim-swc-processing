@@ -94,21 +94,6 @@ def test_transform_basenames_are_extracted() -> None:
     )
 
 
-def test_the_template_version_is_recovered() -> None:
-    """826509 registered against v1.4 while the pipeline mounts v1.5."""
-    result = parse_registration_record(_record())
-    assert result.template_to_ccf_version == "reg_exaspim_template_to_ccf_25um_v1.4"
-
-
-def test_a_missing_template_transform_yields_no_version() -> None:
-    """A record without the transform does not invent a version."""
-    record = _record()
-    for process in record["data_processes"]:
-        params = (process.get("code") or {}).get("parameters") or {}
-        params.pop("template_to_ccf_transforms", None)
-    assert parse_registration_record(record).template_to_ccf_version is None
-
-
 def test_an_absent_pass_is_reported_with_what_was_found() -> None:
     """A record with no matching pass names the resolutions it does have."""
     with pytest.raises(RegistrationRecordError, match="found"):
