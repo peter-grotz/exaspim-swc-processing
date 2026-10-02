@@ -118,6 +118,20 @@ def test_index_to_physical_does_not_depend_on_shape() -> None:
     """
 
     def index_to_physical(image: _Image, index: np.ndarray) -> np.ndarray:
+        """Map voxel indices to physical points, as ANTs does.
+
+        Parameters
+        ----------
+        image : _Image
+            Image whose stamped geometry is used.
+        index : np.ndarray
+            Voxel indices, one row per point.
+
+        Returns
+        -------
+        np.ndarray
+            Physical points, one row per index.
+        """
         direction = np.asarray(image.direction).reshape((3, 3))
         return np.asarray(image.origin) + (index * np.asarray(image.spacing)) @ direction.T
 
